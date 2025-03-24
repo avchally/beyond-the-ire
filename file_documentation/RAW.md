@@ -13,20 +13,24 @@
 | 0x0C  | 2 | VERTICES_OFFSET_REPEAT | Offset to vertices section (again, not sure why) |
 | 0x0E  | 2 | SIGNATURE | Signature is ASCII chars "WR" |
 | 0x10  | 2 | MID_PLATFORMS_SECTION | Offset to intermediate platforms (if there are any, otherwise 0x00) |
-| 0x12  | 2 |  | Section 7 size |
+| 0x12  | 2 | SECTION_7_SIZE | Section 7 size TODO unknown section |
 | 0x14  | 2 | VERTICES_SECTION_SIZE | Size of the vertices section |
 | 0x16  | 2 | OBJECTS_SECTION_SIZE | Size of the objects section |
 | 0x18  | 2 | FOOTER_SIZE | Footer size (I guess. always seems to be 0x08) |
-| 0x1A  | 2 | COMMAND_SECTION_SIZE | Size of the commands section |
+| 0x1A  | 2 | COMMANDS_SECTION_SIZE | Size of the commands section |
 | 0x1C  | 2 | SECTOR_COUNT | Number of objects in the sector section |
 
+The file size can be calculated with:
+`FILE_SIZE = VERTICES_OFFSET + VERTICES_SECTION_SIZE + COMMANDS_SECTION_SIZE + SECTION_7_SIZE + OBJECTS_SECTION_SIZE + FOOTER_SIZE`;
 
 **Quick note on textures**
+
 Most of the time, when a texture index is specified, 0xFFXX can also be used to map a single color from the palette, where XX is the index in the palette.
 
 ## Sectors Section
 
 **Starts at `HEADER.SECTORS_OFFSET`**
+
 This section contains sector data. A sector is a collection of faces that form a closed 2D shape. A sector contains data such as floor height, ceiling height, texture mapping, and lighting. The very end of the section is a 2 byte value that represents the total number of faces in the file.
 
 The section is laid out like this:
@@ -225,7 +229,7 @@ The command object is as follows:
 
 ## Section 7 (WIP)
 
-**Starts at `HEADER.VERTICES_OFFSET + HEADER.VERTICES_SECTION_SIZE + HEADER.COMMAND_SECTION_SIZE`**
+**Starts at `HEADER.VERTICES_OFFSET + HEADER.VERTICES_SECTION_SIZE + HEADER.COMMANDS_SECTION_SIZE`**
 
 Little is known about this section, but it tends to be pretty small. In my testing, modifying this resulted in no apparent changes. Will need to do more testing.
 
@@ -258,10 +262,9 @@ The element object for UNKNOWN_ARRAY_02:
 | ----------- | ----------- | ----------- | ----------- |
 | 0x00 | 32 (0x20) | UNK_0X00 | TODO |
 
-
 ## Objects Section
 
-**Starts at `HEADER.VERTICES_OFFSET + HEADER.VERTICES_SECTION_SIZE + HEADER.COMMAND_SECTION_SIZE + ` TODO**
+**Starts at `HEADER.VERTICES_OFFSET + HEADER.VERTICES_SECTION_SIZE + HEADER.COMMANDS_SECTION_SIZE +` TODO**
 
 This section contains data related to in-game objects. An object, similar to a **thing** in DOOM, can represent an item, projectile, enemy, interactable object, floor trigger, etc.
 
@@ -302,4 +305,5 @@ And here is the object itself:
 ## Footer
 
 Seems to pretty consistently be the following value:
+
 `08 00 08 00 00 00 00 00`
