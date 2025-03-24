@@ -20,7 +20,7 @@
 | 0x1A  | 2 | COMMANDS_SECTION_SIZE | Size of the commands section |
 | 0x1C  | 2 | SECTOR_COUNT | Number of objects in the sector section |
 
-The file size can be calculated with:
+The file size can be calculated with:  
 `FILE_SIZE = VERTICES_OFFSET + VERTICES_SECTION_SIZE + COMMANDS_SECTION_SIZE + SECTION_7_SIZE + OBJECTS_SECTION_SIZE + FOOTER_SIZE`;
 
 **Quick note on textures**
