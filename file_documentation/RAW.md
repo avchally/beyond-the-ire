@@ -109,28 +109,28 @@ See the object data below:
 | 0x04  | 2 | UPPER_TEXTURE_INDEX | Texture for the upper portion (ie, when the ceiling on an adjacent sector is lower) |
 | 0x06  | 2 | LOWER_TEXTURE_INDEX | Texture for the lower portion (ie, when the floor on an adjacent sector is higher) |
 | 0x08  | 2 | UNK_0x08 | TODO: not fully figured out. 0xAE fits to size |
-| 0x0A? | 1 \| 0 | SHIFT_TEXTURE_X | Shifts the texture along the x-axis (optional, see TYPE field) |
-| 0x0B? | 1 \| 0 | SHIFT_TEXTURE_Y | Shifts the texture along the y-axis (optional, see TYPE field) |
+| 0x0A? | 1 \| 0 (signed) | SHIFT_TEXTURE_X | Shifts the texture along the x-axis (optional, see TYPE field) |
+| 0x0B? | 1 \| 0 (signed) | SHIFT_TEXTURE_Y | Shifts the texture along the y-axis (optional, see TYPE field) |
 | 0x0C? | 2 \| 0 | UNK_0x0C | TODO |
 
 **On texture shifting:** if a texture is shifted even a pixel too far (where empty texture would be rendered), the whole face will have messed up rendering
 
 ## Intermediate Platforms Section (WIP)
 
-**Starts at `HEADER.MID_PLATFORMS_SECTION`**
+**Starts at `HEADER.MID_PLATFORMS_SECTION` (or `HEADER.MID_PLATFORMS_SECTION - 0x02` if you include the count. See below for details.)**
 
 This is an optional section and contains data about intermediate (or middle) platforms.
 
 Unlike the DOOM engine, ROTH can create additional platforms within a sector. An intermediate platform contains a ceiling and a floor, where the ceiling is the underside of the platform and the floor is the topside.
 
-If `HEADER.MID_PLATFORMS_SECTION` is 0x00, this section is not present.
+If `HEADER.MID_PLATFORMS_SECTION` is 0x00, this section is not present. It's also important to note that, like the other first few sections, the count is contained in the 2 bytes preceding the offset in the header.
 
 The section is laid out as follows:
 
 | Offset | Size (bytes) | Field | Description |
 | ----------- | ----------- | ----------- | ----------- |
-| 0x00  | 2 | COUNT | Number of intermediate platforms |
-| 0x02  | 0x0E * COUNT | MID_PLATFORMS | Array of intermediate platforms |
+| -0x02  | 2 | COUNT | Number of intermediate platforms |
+| 0x00  | 0x0E * COUNT | MID_PLATFORMS | Array of intermediate platforms |
 
 The intermediate platform object:
 
@@ -161,7 +161,7 @@ This section contains various metadata about the map and even contains fields th
 | 0x0C  | 2 | MAX_CLIMB | The max height that the player can climb before needing to jump. Default is 0x20. This value persists throughout the whole game. |
 | 0x0E  | 2 | MIN_FIT | The minimum size that the player can still fit through openings. Default is 0x30. This value persists throughout the whole game. |
 | 0x10  | 2 | UNK_0x10 | TODO |
-| 0x12  | 2 (signed) | CANDLE_GLOW | Sets how much light that light sources produce recommended values 0x00 - 0x20. Can be set to a really large value to overpower the LIGHT_AMBIENCE setting. |
+| 0x12  | 2 (signed) | CANDLE_GLOW | Sets how much light that light sources produce. Recommended values 0x00 - 0x20. Can be set to a really large value to overpower the LIGHT_AMBIENCE setting. |
 | 0x14  | 2 | LIGHT_AMBIENCE | The general brightness of the map. Only values 0x00 - 0x02. (To make the map brighter, use CANDLE_GLOW) | 
 | 0x16  | 2 | UNK_0x16 | TODO. Adds blueish shadows with any non-0 value. Maybe related to gamma fix? |
 | 0x18  | 2 | SKY_TEXTURE | Texture index for the skybox |
@@ -181,7 +181,7 @@ The section has a small header containing a few metadata fields and then the arr
 | 0x02  | 2 | SECTION_HEADER_SIZE | ? always seems to be 0x08, which is the size of this sections header |
 | 0x04  | 2 | BLANK | TODO. determine if always blank or could represent something else |
 | 0x06  | 2 | VERTICES_COUNT | Total number of vertices in the section |
-| 0x08  | 0x0C * VERTICES_COUNT | VERTICES | Array of vertice objects |
+| 0x08  | 0x0C * VERTICES_COUNT | VERTICES | Array of vertex objects |
 
 The vertex object:
 
@@ -191,8 +191,8 @@ The vertex object:
 | 0x02  | 2 | UNK_0x02 | Seems to always be zero |
 | 0x04  | 2 | UNK_0x04 | Seems to always be zero |
 | 0x06  | 2 | UNK_0x06 | Seems to always be zero |
-| 0x08  | 2 | POS_X | X-coordinate of the vertex |
-| 0x08  | 2 | POS_Y | Y-coordinate of the vertex |
+| 0x08  | 2 (signed) | POS_X | X-coordinate of the vertex |
+| 0x0A  | 2 (signed) | POS_Y | Y-coordinate of the vertex |
 
 ## Commands Section (WIP)
 
@@ -212,8 +212,7 @@ Here is the breakdown of the commands section:
 | 0x02  | 2 | UNK_0x02 | TODO |
 | 0x04  | 2 | COMMANDS_OFFSET | Offset from section start to the commands array |
 | 0x06  | 2 | COMMAND_COUNT | Total number of defined commands |
-| 0x08  | 2 | UNK_0x08 | TODO. seems to be 0x00 or 0x44 |
-| 0x0A  | 58 (0x3A) | COUNTS_SECTION | Seems to be a fixed size representing a breakdown of the counts of commands. May be command categories? |
+| 0x08  | 60 (0x3C) | COUNTS_SECTION | Seems to be a fixed size representing a breakdown of the counts of commands. Seems to relate to how a command can be called. (i.e., if a command is triggered by walking over a sector floor or a click interaction) |
 | 0x44  | 2 * COMMAND_COUNT | COMMAND_ENTRY_POINTS | An array of 2 byte values, that are offsets (from section start) to a command, indicating the start of a command chain. The elements here are commands that can be called by objects placed in the map. The array is the size of the total number of commands (in the case that all commands should be accessible and callable by an object), otherwise the remaining elements are just 0x0000. |
 | COMMANDS_OFFSET  | ~~ | COMMANDS | An array of command objects |
 
@@ -222,8 +221,8 @@ The command object is as follows:
 | Offset | Size (bytes) | Field | Description |
 | ----------- | ----------- | ----------- | ----------- |
 | 0x00  | 2 | SIZE | Size in bytes of the command |
-| 0x02  | 1 | UNK_0x02 | A further type identified, most of the time 0x00 |
-| 0x03  | 1 | TYPE | The actual command to run. (e.g., 0x29 is add item to inventory) |
+| 0x02  | 1 | TYPE_B | Additional command identifier information. Most of the time 0x00 |
+| 0x03  | 1 | TYPE_A | The actual command to run. (e.g., 0x29 is add item to inventory) |
 | 0x04  | 2 | NEXT_COMMAND | Index (1-based) of the next command to run in the chain. 0x00 ends the chain |
 | 0x06  | SIZE - 0x06 | ARGS | Array of 2 byte values that represent all required arguments for the given TYPE, e.g., for the 0x29 (add item to inventory) command, the first argument is _UNKNOWN_ and the second argument is the item ID to add to inventory |
 
