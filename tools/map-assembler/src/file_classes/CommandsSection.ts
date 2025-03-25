@@ -27,11 +27,12 @@ export default class CommandsSection {
 }
 
 export class Command {
+    public selfOffset?: number;
     public nextCommand?: Command;
     public commandsThatCallThis: Command[];
 
-    constructor(
-        public rawCommand: Buffer,
+    public constructor(
+        public rawCommand: string,
         public size: number, // 0x0000
         public typeA: number, // 0x00
         public typeB: number, // 0x00
@@ -39,5 +40,18 @@ export class Command {
         public remainingArgs: number[], // 0x0000 sized
     ) {
         this.commandsThatCallThis = [];
+    }
+
+    public toString(): string {
+        return `
+            self offset: 0x${this.selfOffset?.toString(16).padStart(4, '0')}
+
+            raw command: ${this.rawCommand}
+            size: 0x${this.size.toString(16).padStart(4, '0')}
+            typeA: 0x${this.typeA.toString(16).padStart(4, '0')}
+            typeB: 0x${this.typeB.toString(16).padStart(4, '0')}
+            nextCommandIndex: 0x${this.nextCommandIndex.toString(16).padStart(4, '0')}
+            args: ${this.remainingArgs.map((value: number) => value.toString(16).padStart(4, '0')).join(' ')}
+        `
     }
 }

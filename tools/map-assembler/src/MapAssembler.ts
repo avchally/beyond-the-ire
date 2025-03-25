@@ -5,6 +5,7 @@ import FaceTextureMappingSection, { ExtraFaceTextureMappingData, FaceTextureMapp
 import MidPlatformsSection, { MidPlatform } from "./file_classes/MidPlatformsSection";
 import MapMetadataSection from "./file_classes/MapMetadataSection";
 import VerticesSection, { Vertex, VerticesHeader } from "./file_classes/VerticesSection";
+import CommandsSection, { Command, CommandsCategoryEntry } from "./file_classes/CommandsSection";
 
 export default class MapAssembler {
     public fileBuffer: Buffer<ArrayBufferLike>;
@@ -15,6 +16,7 @@ export default class MapAssembler {
     public midPlatformsSection?: MidPlatformsSection; // may not exist in the map
     public mapMetadataSection: MapMetadataSection;
     public verticesSection: VerticesSection;
+    public commandsSection: CommandsSection;
 
     public constructor(fileBuffer: Buffer<ArrayBufferLike>) {
         this.fileBuffer = fileBuffer;
@@ -25,6 +27,7 @@ export default class MapAssembler {
         this.faceTextureMappingSection = new FaceTextureMappingSection();
         this.mapMetadataSection = new MapMetadataSection();
         this.verticesSection = new VerticesSection();
+        this.commandsSection = new CommandsSection();
 
         this.parseFile();
     }
@@ -256,15 +259,108 @@ export default class MapAssembler {
             currentPosition += 0x0C;
         }
 
+        // console.log(`Vertices section results:\n`
+        //     + `Vertices header: 
+        //         sectionSize: ${this.verticesSection.header.sectionSize}
+        //         sectionHeaderSize: ${this.verticesSection.header.sectionHeaderSize}
+        //         unk0x04: ${this.verticesSection.header.unk0x04}
+        //         verticesCount: ${this.verticesSection.header.verticesCount}\n`
+        //     + `First vertex: ${this.verticesSection.vertices[0]?.toString()}\n`
+        //     + `Second vertex: ${this.verticesSection.vertices[1]?.toString()}\n`
+        // );
+    }
+
+    private parseCommandsSection() {
+        const commandSectionStart = this.header.verticesOffset + this.header.verticesSectionSize;
+        let currentPosition = commandSectionStart;
+        this.commandsSection.header = {
+            signature: this.fileBuffer.toString('ascii', currentPosition, currentPosition + 0x02),
+            unk0x02: this.fileBuffer.readUInt16LE(currentPosition + 0x02),
+            relativeOffsetToCommands: this.fileBuffer.readUInt16LE(currentPosition + 0x04),
+            commandCount: this.fileBuffer.readUInt16LE(currentPosition + 0x06),
+        }
+        currentPosition += 0x08;
+
+        for (let i = 0; i < 15; i++) {
+            this.commandsSection.commandCategoriesSection[i] = {
+                category: this.fileBuffer.readUInt16LE(currentPosition),
+                count: this.fileBuffer.readUInt16LE(currentPosition + 0x02)
+            }
+            currentPosition += 0x04;
+        }
+
+        if (currentPosition !== commandSectionStart + this.commandsSection.header.relativeOffsetToCommands) {
+            console.log(`Command start offset mismatch: ` 
+                + `expected relative offset: 0x${this.commandsSection.header.relativeOffsetToCommands.toString(16).padStart(4, '0')} `
+                + `ended relative offset: 0x${currentPosition.toString(16).padStart(4, '0')}`
+            )
+        }
+
+        currentPosition = commandSectionStart + this.commandsSection.header.relativeOffsetToCommands;
+        let positionInCommand = 0x00;
+        let commandSize = 0x00;
+        for (let i = 0; i < this.commandsSection.header.commandCount; i++) {
+            positionInCommand = 0x00;
+            commandSize = 0x00;
+            let typeA: number = 0;
+            let typeB: number = 0;
+            let nextCommand: number = 0;
+            const args: number[] = [];
+            let rawCommand = '';
+            commandSize = this.fileBuffer.readUInt16LE(currentPosition + positionInCommand);
+            rawCommand += commandSize.toString(16).padStart(4, '0');
+            positionInCommand += 0x02;
+            while (positionInCommand < commandSize) {
+                switch (positionInCommand) {
+                    case 0x00:
+                        // this shouldn't happen
+                        positionInCommand += 0x02;
+                        break;
+                    case 0x02: 
+                        typeB = this.fileBuffer.readUInt8(currentPosition + positionInCommand);
+                        rawCommand += ' ' + typeB.toString(16).padStart(2, '0');
+                        positionInCommand += 0x01;
+                        break;
+                    case 0x03:
+                        typeA = this.fileBuffer.readUInt8(currentPosition + positionInCommand);
+                        rawCommand += ' ' + typeA.toString(16).padStart(2, '0');
+                        positionInCommand += 0x01;
+                        break;
+                    case 0x04:
+                        nextCommand = this.fileBuffer.readUInt16LE(currentPosition + positionInCommand);
+                        rawCommand += ' ' + nextCommand.toString(16).padStart(4, '0');
+                        positionInCommand += 0x02;
+                    default:
+                        const arg = this.fileBuffer.readUInt16LE(currentPosition + positionInCommand);
+                        args.push(arg);
+                        rawCommand += ' ' + arg.toString(16).padStart(4, '0');
+                        positionInCommand += 0x02;
+                        break;
+                }
+            }
+            const command = new Command(rawCommand, commandSize, typeA, typeB, nextCommand, args);
+            command.selfOffset = currentPosition;
+            this.commandsSection.commands.push(command);
+            this.commandsSection.offsetMap[currentPosition] = command;
+            this.commandsSection.relativeOffsetMap[currentPosition - commandSectionStart] = command;
+            currentPosition += commandSize;
+        }
+
+
         console.log(`Vertices section results:\n`
-            + `Vertices header: 
-                sectionSize: ${this.verticesSection.header.sectionSize}
-                sectionHeaderSize: ${this.verticesSection.header.sectionHeaderSize}
-                unk0x04: ${this.verticesSection.header.unk0x04}
-                verticesCount: ${this.verticesSection.header.verticesCount}\n`
-            + `First vertex: ${this.verticesSection.vertices[0]?.toString()}\n`
-            + `Second vertex: ${this.verticesSection.vertices[1]?.toString()}\n`
+            + `Commands section header: 
+                signature: ${this.commandsSection.header.signature}
+                unk0x02: ${this.commandsSection.header.unk0x02.toString(16).padStart(4, '0')}
+                relativeOffsetToCommands: ${this.commandsSection.header.relativeOffsetToCommands.toString(16).padStart(4, '0')}
+                commandCount: ${this.commandsSection.header.commandCount.toString(16).padStart(4, '0')}\n`
+            + `counts: ${this.commandsSection.commandCategoriesSection.map((value: CommandsCategoryEntry, index: number) => {
+                return `(${index}) cat: ${value.category.toString(16).padStart(4, '0')} count: ${value.count.toString(16).padStart(4, '0')}`
+            })}`
+            + `First command: ${this.commandsSection.commands[0]?.toString()}\n`
+            + `Second command: ${this.commandsSection.commands[1]?.toString()}\n`
+            + `Third command: ${this.commandsSection.commands[2]?.toString()}\n`
         );
+
     }
 
     private parseFile(): void {
@@ -276,5 +372,6 @@ export default class MapAssembler {
         this.parseMidPlatformSection();
         this.parseMapMetadata();
         this.parseVerticesSection();
+        this.parseCommandsSection();
     }
 }
