@@ -6,6 +6,8 @@ import MidPlatformsSection, { MidPlatform } from "./file_classes/MidPlatformsSec
 import MapMetadataSection from "./file_classes/MapMetadataSection";
 import VerticesSection, { Vertex, VerticesHeader } from "./file_classes/VerticesSection";
 import CommandsSection, { Command, CommandsCategoryEntry } from "./file_classes/CommandsSection";
+import Section7, { UnkObject01, UnkObject02 } from "./file_classes/Section7";
+import ObjectsSection, { GameObject, ObjectContainer } from "./file_classes/ObjectsSection";
 
 export default class MapAssembler {
     public fileBuffer: Buffer<ArrayBufferLike>;
@@ -17,6 +19,9 @@ export default class MapAssembler {
     public mapMetadataSection: MapMetadataSection;
     public verticesSection: VerticesSection;
     public commandsSection: CommandsSection;
+    public section7: Section7;
+    public objectsSection: ObjectsSection;
+    public footer: bigint;
 
     public constructor(fileBuffer: Buffer<ArrayBufferLike>) {
         this.fileBuffer = fileBuffer;
@@ -28,8 +33,53 @@ export default class MapAssembler {
         this.mapMetadataSection = new MapMetadataSection();
         this.verticesSection = new VerticesSection();
         this.commandsSection = new CommandsSection();
+        this.section7 = new Section7();
+        this.objectsSection = new ObjectsSection();
+        this.footer = 0n;
 
         this.parseFile();
+
+        this.commandAnalysis();
+    }
+
+
+    private commandAnalysis() {
+        console.log(`public command chains:\n`);
+        for (let entryCommand of this.commandsSection.commandEntryPoints) {
+            let currentCommand: Command | undefined = entryCommand;
+            let fallbackCount = 0;
+            while (currentCommand) {
+                console.log(currentCommand.rawCommand);
+                currentCommand = currentCommand.nextCommand;
+                fallbackCount++;
+                if (fallbackCount > 10000) {
+                    console.log('INFINITE LOOP');
+                    break;
+                }
+            }
+            console.log();
+            // console.log('---------------------------------------------');
+        }
+    }
+
+
+    ///////////////////
+    // PARSE METHODS //
+    ///////////////////
+
+    private parseFile(): void {
+        this.parseHeader();
+        this.confirmFileSize();
+        this.parseSectorsSection();
+        this.parseFacesSection();
+        this.parseFaceTextureMappingSection();
+        this.parseMidPlatformSection();
+        this.parseMapMetadata();
+        this.parseVerticesSection();
+        this.parseCommandsSection();
+        this.parseSection7();
+        this.parseObjectsSection();
+        this.parseFooter();
     }
 
     private parseHeader() {
@@ -289,10 +339,15 @@ export default class MapAssembler {
             currentPosition += 0x04;
         }
 
+        for (let i = 0; i < this.commandsSection.header.commandCount; i++) {
+            this.commandsSection.commandEntryPointsOffsets.push(this.fileBuffer.readUInt16LE(currentPosition));
+            currentPosition += 0x02;
+        }
+
         if (currentPosition !== commandSectionStart + this.commandsSection.header.relativeOffsetToCommands) {
             console.log(`Command start offset mismatch: ` 
                 + `expected relative offset: 0x${this.commandsSection.header.relativeOffsetToCommands.toString(16).padStart(4, '0')} `
-                + `ended relative offset: 0x${currentPosition.toString(16).padStart(4, '0')}`
+                + `ended relative offset: 0x${(currentPosition - commandSectionStart).toString(16).padStart(4, '0')}`
             )
         }
 
@@ -346,32 +401,186 @@ export default class MapAssembler {
             currentPosition += commandSize;
         }
 
+        for (const commandOffset of this.commandsSection.commandEntryPointsOffsets) {
+            if (commandOffset === 0x0000) {
+                continue;
+            }
 
-        console.log(`Vertices section results:\n`
-            + `Commands section header: 
-                signature: ${this.commandsSection.header.signature}
-                unk0x02: ${this.commandsSection.header.unk0x02.toString(16).padStart(4, '0')}
-                relativeOffsetToCommands: ${this.commandsSection.header.relativeOffsetToCommands.toString(16).padStart(4, '0')}
-                commandCount: ${this.commandsSection.header.commandCount.toString(16).padStart(4, '0')}\n`
-            + `counts: ${this.commandsSection.commandCategoriesSection.map((value: CommandsCategoryEntry, index: number) => {
-                return `(${index}) cat: ${value.category.toString(16).padStart(4, '0')} count: ${value.count.toString(16).padStart(4, '0')}`
-            })}`
-            + `First command: ${this.commandsSection.commands[0]?.toString()}\n`
-            + `Second command: ${this.commandsSection.commands[1]?.toString()}\n`
-            + `Third command: ${this.commandsSection.commands[2]?.toString()}\n`
-        );
+            this.commandsSection.commandEntryPoints.push(this.commandsSection.relativeOffsetMap[commandOffset]);
+        }
+
+        for (const command of this.commandsSection.commands) {
+            if (!command.nextCommandIndex) {
+                continue;
+            }
+
+            const nextCommand = this.commandsSection.commands[command.nextCommandIndex - 1];
+            command.nextCommand = nextCommand;
+            nextCommand.commandsThatCallThis.push(command);
+        }
+
+
+        // console.log(`Vertices section results:\n`
+        //     + `Commands section header: 
+        //         signature: ${this.commandsSection.header.signature}
+        //         unk0x02: ${this.commandsSection.header.unk0x02.toString(16).padStart(4, '0')}
+        //         relativeOffsetToCommands: ${this.commandsSection.header.relativeOffsetToCommands.toString(16).padStart(4, '0')}
+        //         commandCount: ${this.commandsSection.header.commandCount.toString(16).padStart(4, '0')}\n`
+        //     + `counts: ${this.commandsSection.commandCategoriesSection.map((value: CommandsCategoryEntry, index: number) => {
+        //         return `\n\t(${index}) cat: ${value.category.toString(16).padStart(4, '0')} count: ${value.count.toString(16).padStart(4, '0')}`
+        //     })}\n\n`
+        //     + `First command: ${this.commandsSection.commands[0]?.toString()}\n`
+        //     + `Second command: ${this.commandsSection.commands[1]?.toString()}\n`
+        //     + `Third command: ${this.commandsSection.commands[2]?.toString()}\n`
+        // );
 
     }
 
-    private parseFile(): void {
-        this.parseHeader();
-        this.confirmFileSize();
-        this.parseSectorsSection();
-        this.parseFacesSection();
-        this.parseFaceTextureMappingSection();
-        this.parseMidPlatformSection();
-        this.parseMapMetadata();
-        this.parseVerticesSection();
-        this.parseCommandsSection();
+    private parseSection7() {
+        const section7Start = this.header.verticesOffset + this.header.verticesSectionSize + this.header.commandsSectionSize;
+        let currentPosition = section7Start;
+        this.section7.header = {
+            size_a: this.fileBuffer.readUInt16LE(currentPosition),
+            count: this.fileBuffer.readUInt16LE(currentPosition + 0x02),
+        }
+        currentPosition += 0x04;
+
+        for (let i = 0; i < this.section7.header.count; i++) {
+            const unkObject01 = new UnkObject01(
+                this.fileBuffer.readInt16LE(currentPosition),
+                this.fileBuffer.readInt16LE(currentPosition + 0x02),
+                this.fileBuffer.readUInt16LE(currentPosition + 0x04),
+                this.fileBuffer.readUInt16LE(currentPosition + 0x06),
+                this.fileBuffer.readUInt16LE(currentPosition + 0x08),
+                this.fileBuffer.readUInt16LE(currentPosition + 0x0A),
+                this.fileBuffer.readUInt16LE(currentPosition + 0x0C),
+                this.fileBuffer.readUInt16LE(currentPosition + 0x0E),
+                this.fileBuffer.readUInt16LE(currentPosition + 0x10),
+            );
+            unkObject01.selfOffset = currentPosition;
+            this.section7.unkArray01.push(unkObject01);
+            currentPosition += 0x12;
+        }
+
+        if (this.section7.header.size_a === this.header.section7Size) {
+            return;
+        }
+
+        this.section7.unkArray02 = [];
+        currentPosition = section7Start + this.section7.header.size_a;
+        while (currentPosition < section7Start + this.header.section7Size) {
+            const unkObject02 = new UnkObject02(
+                this.fileBuffer.readUInt16LE(currentPosition),
+                this.fileBuffer.readUInt16LE(currentPosition + 0x02),
+                this.fileBuffer.readUInt16LE(currentPosition + 0x04),
+                this.fileBuffer.readUInt16LE(currentPosition + 0x06),
+                this.fileBuffer.readUInt16LE(currentPosition + 0x08),
+                this.fileBuffer.readUInt16LE(currentPosition + 0x0A),
+                this.fileBuffer.readUInt16LE(currentPosition + 0x0C),
+                this.fileBuffer.readUInt16LE(currentPosition + 0x0E),
+                this.fileBuffer.readUInt16LE(currentPosition + 0x10),
+                this.fileBuffer.readUInt16LE(currentPosition + 0x12),
+                this.fileBuffer.readUInt16LE(currentPosition + 0x14),
+                this.fileBuffer.readUInt16LE(currentPosition + 0x16),
+                this.fileBuffer.readUInt16LE(currentPosition + 0x18),
+                this.fileBuffer.readUInt16LE(currentPosition + 0x1A),
+                this.fileBuffer.readUInt16LE(currentPosition + 0x1C),
+                this.fileBuffer.readUInt16LE(currentPosition + 0x1E),
+            );
+            unkObject02.selfOffset = currentPosition;
+            this.section7.unkArray02.push(unkObject02);
+            currentPosition += 0x20;
+        }
+
+        // console.log(`Vertices section results:\n`
+        //     + `Vertices header: 
+        //         size_a: ${this.section7.header.size_a}
+        //         count: ${this.section7.header.count}\n`
+        //     + `UnkArray01:\n`
+        //     + `First element: ${this.section7.unkArray01[0]?.toString()}\n`
+        //     + `Second element: ${this.section7.unkArray01[1]?.toString()}\n\n`
+        //     + `UnkArray02:\n`
+        //     + `First element: ${this.section7.unkArray02[0]?.toString()}\n`
+        //     + `Second element: ${this.section7.unkArray02[1]?.toString()}\n`
+        // );
+    }
+
+    private parseObjectsSection() {
+        const objectsSectionStart = this.header.verticesOffset + this.header.verticesSectionSize + this.header.commandsSectionSize + this.header.section7Size;
+        let currentPosition = objectsSectionStart;
+        this.objectsSection.size = this.fileBuffer.readUInt16LE(currentPosition);
+        currentPosition += 0x02;
+        for (let i = 0; i < this.header.sectorCount; i++) {
+            const objectContainerRelativeOffset = this.fileBuffer.readUInt16LE(currentPosition)
+            this.objectsSection.sectorObjectMapping.push(objectContainerRelativeOffset);
+            if (objectContainerRelativeOffset === 0x0000) {
+                currentPosition += 0x02;
+                continue;
+            }
+            
+            const objectContainer = new ObjectContainer();
+            objectContainer.associatedSector = this.sectorsSection.sectors[i];
+            this.sectorsSection.sectors[i].associatedObjectContainer = objectContainer;
+            this.objectsSection.objectContainers.push(objectContainer);
+
+            const objectContainerOffset = objectsSectionStart + objectContainerRelativeOffset;
+            objectContainer.count = this.fileBuffer.readUint8(objectContainerOffset);
+            objectContainer.countRepeat = this.fileBuffer.readUint8(objectContainerOffset + 0x01);
+            objectContainer.selfRelativeOffset = objectContainerRelativeOffset;
+            objectContainer.selfOffset = objectContainerOffset;
+
+            let gameObjectPosition = objectContainerOffset + 0x02;
+            for (let j = 0; j < objectContainer.count; j++) {
+                const gameObject = new GameObject(
+                    this.fileBuffer.readInt16LE(gameObjectPosition), // posX
+                    this.fileBuffer.readInt16LE(gameObjectPosition + 0x02), // posY
+                    this.fileBuffer.readUInt8(gameObjectPosition + 0x04), // textureIndex
+                    this.fileBuffer.readUInt8(gameObjectPosition + 0x05), // textureSource
+                    this.fileBuffer.readUInt8(gameObjectPosition + 0x06), // rotation
+                    this.fileBuffer.readUInt8(gameObjectPosition + 0x07), // unk0x07
+                    this.fileBuffer.readUInt8(gameObjectPosition + 0x08), // lighting
+                    this.fileBuffer.readUInt8(gameObjectPosition + 0x09), // renderType
+                    this.fileBuffer.readUInt16LE(gameObjectPosition + 0x0A), // posZ
+                    this.fileBuffer.readUInt16LE(gameObjectPosition + 0x0C), // unk0x0C
+                    this.fileBuffer.readUInt16LE(gameObjectPosition + 0x0E), // unk0x0E
+                );
+                gameObject.container = objectContainer;
+                gameObject.selfOffset = gameObjectPosition;
+                objectContainer.objects.push(gameObject);
+
+                gameObjectPosition += 0x10;
+            }
+            currentPosition += 0x02;
+        }
+
+        // console.log(`Objects section results:\n`
+        //     + `
+        //         size: ${this.objectsSection.size}
+        //         sectorMappingCount: ${this.objectsSection.sectorObjectMapping.length}
+        //         sectorMapping: ${this.objectsSection.sectorObjectMapping.map((offset: number) => '0x' + offset.toString(16).padStart(4, '0')).join(' ')}\n`
+        //     + `First object container: ${this.objectsSection.objectContainers[0]?.toString()}\n`
+        //     + `Second object container: ${this.objectsSection.objectContainers[1]?.toString()}\n`
+        // );
+
+    }
+
+    private parseFooter() {
+        const footerStart = this.header.verticesOffset + this.header.verticesSectionSize + this.header.commandsSectionSize + this.header.section7Size + this.header.objectsSectionSize;
+        if (this.fileBuffer.length - this.header.footerSize !== footerStart) {
+            console.log('Found a footer discrepancy. Inconsistent size.');
+        }
+
+        if (this.fileBuffer.length - footerStart !== 0x08) {
+            console.log('Found a footer discrepancy. Not 0x08 in size. WILL AFFECT FOOTER VALUE READ.');
+        }
+
+        this.footer = this.fileBuffer.readBigUInt64LE(footerStart);
+
+        if (this.footer !== 524296n) {
+            console.log('FOUND A DIFFERENT FOOTER.');
+        }
+
+        // console.log(this.footer.toString(16).padStart(16, '0'));
+        // console.log(this.footer);
     }
 }

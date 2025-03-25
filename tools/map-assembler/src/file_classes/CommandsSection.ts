@@ -13,16 +13,20 @@ export interface CommandsCategoryEntry {
 export default class CommandsSection {
     public header?: CommandsSectionHeader;
     public commandCategoriesSection: CommandsCategoryEntry[] = new Array(15).fill({ category: 0, count: 0 });
+    public commandEntryPointsOffsets: number[];
+    public commandEntryPoints: Command[];
     public commands: Command[];
     public offsetMap: { [offset: number]: Command };
     public relativeOffsetMap: { [relativeOffset: number]: Command }; // offset relative to the start of the section
-    public commandChains: Command[]; // just the first command since they're linked
+    // public commandChains: Command[]; // just the first command since they're linked
 
     public constructor() {
         this.commands = [];
         this.offsetMap = {};
         this.relativeOffsetMap = {};
-        this.commandChains = [];
+        // this.commandChains = [];
+        this.commandEntryPointsOffsets = [];
+        this.commandEntryPoints = [];
     }
 }
 
@@ -48,8 +52,8 @@ export class Command {
 
             raw command: ${this.rawCommand}
             size: 0x${this.size.toString(16).padStart(4, '0')}
-            typeA: 0x${this.typeA.toString(16).padStart(4, '0')}
-            typeB: 0x${this.typeB.toString(16).padStart(4, '0')}
+            typeA: 0x${this.typeA.toString(16).padStart(2, '0')}
+            typeB: 0x${this.typeB.toString(16).padStart(2, '0')}
             nextCommandIndex: 0x${this.nextCommandIndex.toString(16).padStart(4, '0')}
             args: ${this.remainingArgs.map((value: number) => value.toString(16).padStart(4, '0')).join(' ')}
         `

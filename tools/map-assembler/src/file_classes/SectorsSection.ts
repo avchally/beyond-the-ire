@@ -1,4 +1,6 @@
 import { Face } from "./FacesSection";
+import { MidPlatform } from "./MidPlatformsSection";
+import { ObjectContainer } from "./ObjectsSection";
 
 export default class SectorsSection {
     public sectors: Sector[];
@@ -15,8 +17,9 @@ export default class SectorsSection {
 export class Sector {
     public selfOffset: number | undefined;
 
-    public faces: Face[] | undefined;
-    public intermediateFloor: undefined;
+    public faces?: Face[];
+    public intermediateFloor?: MidPlatform;
+    public associatedObjectContainer?: ObjectContainer
 
     constructor(
         public ceilingHeight = 0x0000,  // signed
