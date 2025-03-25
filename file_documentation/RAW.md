@@ -232,34 +232,36 @@ The command object is as follows:
 
 Little is known about this section, but it tends to be pretty small. In my testing, modifying this resulted in no apparent changes. Will need to do more testing.
 
+There could be an additional optional section that contains 0x20-sized elements. The size of this sub-section is NOT included in the size of the overall section's header. It IS, however, included in the section size of the file's header.
+
 The section is as follows:
 
 | Offset | Size (bytes) | Field | Description |
 | ----------- | ----------- | ----------- | ----------- |
-| 0x00  | 2 | SIZE | Size in bytes of the section |
+| 0x00  | 2 | SIZE_A | Size in bytes of the section's first sub-section |
 | 0x02  | 2 | COUNT | Count of elements in section's array |
 | 0x04  | 0x12 * COUNT | UNKNOWN_ARRAY_01 | Array of section elements TODO |
-| 0x12 * COUNT | SIZE - 0x12 * COUNT | UNKNOWN_ARRAY_02 | Optionally, there may be an additional end section of 0x20-sized elements |
+| SIZE_A | HEADER.SECTION_7_SIZE - SIZE_A | UNKNOWN_ARRAY_02 | Optionally, there may be an additional ending sub-section of 0x20-sized elements |
 
 The element object for UNKNOWN_ARRAY_01:
 
 | Offset | Size (bytes) | Field | Description |
 | ----------- | ----------- | ----------- | ----------- |
-| 0x00 | 2 (signed) | UNK_0X00 | TODO |
-| 0x02 | 2 (signed) | UNK_0X02 | TODO |
-| 0x04 | 2 | UNK_0X04 | TODO |
-| 0x06 | 2 | UNK_0X06 | TODO |
-| 0x08 | 2 | UNK_0X08 | TODO |
-| 0x0A | 2 | UNK_0X0A | TODO |
-| 0x0C | 2 | UNK_0X0C | TODO |
-| 0x0E | 2 | UNK_0X0E | TODO |
-| 0x10 | 2 | UNK_0X10 | TODO |
+| 0x00 | 2 (signed) | UNK_0x00 | TODO |
+| 0x02 | 2 (signed) | UNK_0x02 | TODO |
+| 0x04 | 2 | UNK_0x04 | TODO |
+| 0x06 | 2 | UNK_0x06 | TODO |
+| 0x08 | 2 | UNK_0x08 | TODO |
+| 0x0A | 2 | UNK_0x0A | TODO |
+| 0x0C | 2 | UNK_0x0C | TODO |
+| 0x0E | 2 | UNK_0x0E | TODO |
+| 0x10 | 2 | UNK_0x10 | TODO |
 
 The element object for UNKNOWN_ARRAY_02:
 
 | Offset | Size (bytes) | Field | Description |
 | ----------- | ----------- | ----------- | ----------- |
-| 0x00 | 32 (0x20) | UNK_0X00 | TODO |
+| 0x00 | 32 (0x20) | UNK_0x00 | TODO |
 
 ## Objects Section
 
