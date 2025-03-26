@@ -10,15 +10,18 @@ export default class VerticesSection {
     
     public vertices: Vertex[];
     public offsetMap: { [offset: number]: Vertex };
+    public relativeOffsetMap: { [offset: number]: Vertex };
 
     public constructor() {
         this.vertices = [];
         this.offsetMap = {};
+        this.relativeOffsetMap = {};
     }
 }
 
 export class Vertex {
     public selfOffset: number | undefined;
+    public selfRelativeOffset: number | undefined;
     
     public constructor(
         public unk0x00 = 0x0000,

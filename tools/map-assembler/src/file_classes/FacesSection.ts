@@ -1,3 +1,7 @@
+import { Vertex } from "./VerticesSection";
+import { Sector } from "./SectorsSection";
+import { FaceTextureMapping } from "./FaceTextureMappingSection";
+
 export default class FacesSection {
     public faces: Face[];
     public offsetMap: { [offset: number]: Face };
@@ -13,11 +17,11 @@ export default class FacesSection {
 export class Face {
     public selfOffset: number | undefined;
     
-    public vertex1: undefined;
-    public vertex2: undefined;
-    public textureMapping: undefined;
-    public sector: undefined;
-    public sisterFace: undefined;
+    public vertex1?: Vertex;
+    public vertex2?: Vertex;
+    public faceTextureMapping?: FaceTextureMapping;
+    public sector?: Sector;
+    public sisterFace?: Face;
     
     public constructor(
         public vertexOffset01 = 0x0000,

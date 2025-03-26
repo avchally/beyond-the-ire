@@ -1,3 +1,5 @@
+import { Sector } from "./SectorsSection";
+
 export default class MidPlatformsSection {
     public count: number;
     public platforms: MidPlatform[];
@@ -12,6 +14,7 @@ export default class MidPlatformsSection {
 
 export class MidPlatform {
     public selfOffset: number | undefined;
+    public associatedSectors: Sector[];
 
     public constructor(
         public ceilingTextureIndex = 0x0000,
@@ -21,7 +24,9 @@ export class MidPlatform {
         public floorHeight = 0x0000, //signed
         public unk0x0A = 0x0000,
         public unk0x0C = 0x0000,
-    ) {}
+    ) {
+        this.associatedSectors = [];
+    }
 
     public toString(): string {
         return `

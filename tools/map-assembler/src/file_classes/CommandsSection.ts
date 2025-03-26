@@ -34,6 +34,7 @@ export class Command {
     public selfOffset?: number;
     public nextCommand?: Command;
     public commandsThatCallThis: Command[];
+    public adjustedIndexInFile?: number; // adjusted so 0 would mean no command
 
     public constructor(
         public rawCommand: string,

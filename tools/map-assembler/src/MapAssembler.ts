@@ -11,6 +11,7 @@ import ObjectsSection, { GameObject, ObjectContainer } from "./file_classes/Obje
 
 export default class MapAssembler {
     public fileBuffer: Buffer<ArrayBufferLike>;
+    public mapName: string;
     public header: Header;
     public sectorsSection: SectorsSection;
     public facesSection: FacesSection;
@@ -23,9 +24,10 @@ export default class MapAssembler {
     public objectsSection: ObjectsSection;
     public footer: bigint;
 
-    public constructor(fileBuffer: Buffer<ArrayBufferLike>) {
+    public constructor(fileBuffer: Buffer<ArrayBufferLike>, mapName: string) {
         this.fileBuffer = fileBuffer;
-        
+        this.mapName = mapName;
+
         this.header = new Header();
         this.sectorsSection = new SectorsSection();
         this.facesSection = new FacesSection();
@@ -38,8 +40,9 @@ export default class MapAssembler {
         this.footer = 0n;
 
         this.parseFile();
+        this.applyRemainingRelations();
 
-        this.commandAnalysis();
+        // this.commandAnalysis();
     }
 
 
@@ -62,6 +65,65 @@ export default class MapAssembler {
         }
     }
 
+    private applyRemainingRelations() {
+        for (const sector of this.sectorsSection.sectors) {
+            if (sector.intermediateFloorOffset > 0x0000) {
+                const midPlatform = this.midPlatformsSection?.offsetMap[sector.intermediateFloorOffset];
+                if (midPlatform) {
+                    sector.intermediateFloor = midPlatform;
+                    midPlatform.associatedSectors.push(sector);
+                } else {
+                    console.log(`Could not find midPlatform on sector (${sector.selfOffset?.toString(16).padStart(4, '0')})`);
+                }
+            }
+            sector.faces = [];
+            for (let i = 0; i < sector.facesCount; i++) {
+                const face = this.facesSection.offsetMap[sector.firstFaceOffset + 0x0C * i];
+                if (!face) {
+                    console.log(`Could not find face on sector (${sector.selfOffset?.toString(16).padStart(4, '0')})`);
+                } else {
+                    face.sector = sector;
+                    sector.faces.push(face);
+                }
+            }
+        }
+
+        for (const face of this.facesSection.faces) {
+            const vertex1 = this.verticesSection.relativeOffsetMap[face.vertexOffset01];
+            if (!vertex1) {
+                console.log(`Could not find vertex1 on face (${face.selfOffset?.toString(16).padStart(4, '0')})`);
+            } else {
+                face.vertex1 = vertex1;
+            }
+
+            const vertex2 = this.verticesSection.relativeOffsetMap[face.vertexOffset01];
+            if (!vertex2) {
+                console.log(`Could not find vertex2 on face (${face.selfOffset?.toString(16).padStart(4, '0')})`);
+            } else {
+                face.vertex2 = vertex2;
+            }
+
+            const faceTextureMapping = this.faceTextureMappingSection.offsetMap[face.textureMappingOffset];
+            if (!faceTextureMapping) {
+                console.log(`Could not find faceTextureMapping on face (${face.selfOffset?.toString(16).padStart(4, '0')})`);
+            } else {
+                face.faceTextureMapping = faceTextureMapping;
+            }
+
+            if (face.sisterFaceOffset !== 0xFFFF) {
+                if (face.sisterFaceOffset === 0x0000) {
+                    console.log('Found a sister face offset of 0x00. Skipping.');
+                    continue;
+                }
+                const sisterFace = this.facesSection.offsetMap[face.sisterFaceOffset];
+                if (!sisterFace) {
+                    console.log(`Could not find sisterFace on face (${face.selfOffset?.toString(16).padStart(4, '0')})`);
+                } else {
+                    face.sisterFace = face;
+                }
+            }
+        }
+    }
 
     ///////////////////
     // PARSE METHODS //
@@ -191,7 +253,7 @@ export default class MapAssembler {
         for (let i = 0; i < this.facesSection.faceTextureMappingCount; i++) {
             const type = this.fileBuffer.readUInt8(currentPosition + 0x01);
             let extraData: undefined | ExtraFaceTextureMappingData;
-            if (type >= 0x80 && type <= 0x8F) {
+            if (type >= 0x80 /* && type <= 0x8F */) {
                 extraData = {
                     shiftTextureX: this.fileBuffer.readInt8(currentPosition + 0x0A),
                     shiftTextureY: this.fileBuffer.readInt8(currentPosition + 0x0B),
@@ -303,8 +365,14 @@ export default class MapAssembler {
             );
 
             vertex.selfOffset = currentPosition;
+            vertex.selfRelativeOffset = currentPosition - this.header.verticesOffset;
             this.verticesSection.vertices.push(vertex);
-            this.verticesSection.offsetMap[currentPosition] = vertex;
+            this.verticesSection.offsetMap[vertex.selfOffset] = vertex;
+            this.verticesSection.relativeOffsetMap[vertex.selfRelativeOffset] = vertex;
+
+            if ((vertex.unk0x00 + vertex.unk0x02 + vertex.unk0x04 + vertex.unk0x06) !== 0x0000) {
+                console.log(`Found additional vertex data! ${vertex.selfOffset}`);
+            }
 
             currentPosition += 0x0C;
         }
@@ -348,7 +416,7 @@ export default class MapAssembler {
             console.log(`Command start offset mismatch: ` 
                 + `expected relative offset: 0x${this.commandsSection.header.relativeOffsetToCommands.toString(16).padStart(4, '0')} `
                 + `ended relative offset: 0x${(currentPosition - commandSectionStart).toString(16).padStart(4, '0')}`
-            )
+            );
         }
 
         currentPosition = commandSectionStart + this.commandsSection.header.relativeOffsetToCommands;
@@ -394,6 +462,7 @@ export default class MapAssembler {
                 }
             }
             const command = new Command(rawCommand, commandSize, typeA, typeB, nextCommand, args);
+            command.adjustedIndexInFile = i + 1;
             command.selfOffset = currentPosition;
             this.commandsSection.commands.push(command);
             this.commandsSection.offsetMap[currentPosition] = command;
