@@ -16,7 +16,7 @@
 | 0x12  | 2 | SECTION_7_SIZE | Section 7 size TODO unknown section |
 | 0x14  | 2 | VERTICES_SECTION_SIZE | Size of the vertices section |
 | 0x16  | 2 | OBJECTS_SECTION_SIZE | Size of the objects section |
-| 0x18  | 2 | FOOTER_SIZE | Footer size (I guess. always seems to be 0x08) |
+| 0x18  | 2 | FOOTER_SIZE | Footer size |
 | 0x1A  | 2 | COMMANDS_SECTION_SIZE | Size of the commands section |
 | 0x1C  | 2 | SECTOR_COUNT | Number of objects in the sector section |
 
@@ -104,7 +104,7 @@ See the object data below:
 | Offset | Size (bytes) | Field | Description |
 | ----------- | ----------- | ----------- | ----------- |
 | 0x00  | 1 | UNK_0x00 | TODO |
-| 0x01  | 1 | TYPE | When this value is 0x8X, additional scaling/shifting metadata is included. X also specifies how many times to repeat the texture while fitting to face |
+| 0x01  | 1 | TYPE | When this value >= 0x80, additional scaling/shifting metadata is included. With 0x8X, X also specifies how many times to repeat the texture while fitting to face |
 | 0x02  | 2 | MID_TEXTURE_INDEX | Primary face texture. The index of the *.DAS texture |
 | 0x04  | 2 | UPPER_TEXTURE_INDEX | Texture for the upper portion (ie, when the ceiling on an adjacent sector is lower) |
 | 0x06  | 2 | LOWER_TEXTURE_INDEX | Texture for the lower portion (ie, when the floor on an adjacent sector is higher) |
@@ -308,3 +308,14 @@ And here is the object itself:
 Seems to pretty consistently be the following value:
 
 `08 00 08 00 00 00 00 00`
+
+**Note:**
+The map `MAUSO1EA` is the only map with a different footer. Its value is below:
+
+```
+Address   00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F
+        -------------------------------------------------
++0x00   | 30 00 08 00 03 00 08 00 38 01 08 22 01 00 01 00
++0x10   | 14 00 4D FE 60 FF 5C 23 00 00 02 00 08 00 4D FF
++0x20   | 24 00 3F FE 48 FE 78 24 00 00 01 00 14 00 3F FF
+```
