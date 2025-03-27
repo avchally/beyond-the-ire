@@ -203,6 +203,7 @@ export default class MapAssembler {
             );
 
             sector.selfOffset = currentPosition;
+            sector.sectorIndex = i;
             this.sectorsSection.sectors.push(sector);
             this.sectorsSection.offsetMap[currentPosition] = sector;
 
@@ -453,6 +454,7 @@ export default class MapAssembler {
                         nextCommand = this.fileBuffer.readUInt16LE(currentPosition + positionInCommand);
                         rawCommand += ' ' + nextCommand.toString(16).padStart(4, '0');
                         positionInCommand += 0x02;
+                        break;
                     default:
                         const arg = this.fileBuffer.readUInt16LE(currentPosition + positionInCommand);
                         args.push(arg);
