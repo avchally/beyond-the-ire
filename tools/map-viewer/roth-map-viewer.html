@@ -1,0 +1,1465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Realms of the Haunting Map Viewer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #222;
+            color: #eee;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            color: #f8bb3d;
+        }
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #333;
+            border-radius: 5px;
+        }
+        .map-select {
+            display: flex;
+            align-items: center;
+        }
+        .map-select select {
+            margin-left: 10px;
+            padding: 5px;
+            background-color: #444;
+            color: #fff;
+            border: 1px solid #666;
+            border-radius: 3px;
+        }
+        .view-controls {
+            display: flex;
+            align-items: center;
+        }
+        .view-controls button {
+            margin-left: 10px;
+            padding: 5px 10px;
+            background-color: #555;
+            color: #fff;
+            border: 1px solid #777;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .view-controls button:hover {
+            background-color: #666;
+        }
+        .canvas-container {
+            position: relative;
+            background-color: #000;
+            border: 1px solid #444;
+            overflow: hidden;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+            min-height: 1000px;
+        }
+        canvas {
+            display: block;
+            background-color: #000;
+        }
+        .map-info {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #333;
+            border-radius: 5px;
+        }
+        .status {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #444;
+            border-radius: 3px;
+            font-family: monospace;
+            overflow: auto;
+            max-height: 100px;
+        }
+        .tooltip {
+            position: absolute;
+            left: 0;
+            top: 0;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 10px;
+            border-radius: 4px;
+            pointer-events: none;
+            z-index: 100;
+            font-family: monospace;
+            max-width: 300px;
+            box-shadow: 0 0 5px rgba(255, 255, 255, 0.2);
+            border: 1px solid #888;
+            display: none;
+        }
+        .file-input {
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #333;
+            border-radius: 5px;
+            text-align: center;
+        }
+        .instructions {
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #333;
+            border-radius: 5px;
+            line-height: 1.5;
+        }
+        .drop-zone {
+            border: 2px dashed #555;
+            border-radius: 5px;
+            padding: 25px;
+            text-align: center;
+            margin-bottom: 20px;
+            background-color: #2a2a2a;
+        }
+        .drop-zone.dragover {
+            border-color: #f8bb3d;
+            background-color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Realms of the Haunting Map Viewer</h1>
+        
+        <div class="instructions">
+            <p>This tool visualizes map files (.RAW) from Realms of the Haunting (1996). Upload your map files using the area below.</p>
+        </div>
+        
+        <div class="drop-zone" id="drop-zone">
+            <p>Drop your .RAW map files here or click to select</p>
+            <input type="file" id="fileInput" accept=".RAW,.raw" multiple style="display: none;">
+        </div>
+        
+        <div class="controls">
+            <div class="map-select">
+                <label for="mapSelect">Select Map:</label>
+                <select id="mapSelect">
+                    <option value="" disabled selected>No maps loaded</option>
+                </select>
+            </div>
+            <div class="view-controls">
+                <button id="zoomIn">Zoom In</button>
+                <button id="zoomOut">Zoom Out</button>
+                <button id="resetView">Reset View</button>
+                <button id="toggleWalls">Toggle BSP Dividers</button>
+            </div>
+        </div>
+        
+        <div class="canvas-container">
+            <canvas id="mapCanvas"></canvas>
+            <div id="tooltip" class="tooltip"></div>
+        </div>
+        
+        <div class="map-info">
+            <h3>Map Information</h3>
+            <div id="mapInfo">No map selected</div>
+            <h3>Status</h3>
+            <div class="status" id="status">Ready to load map files.</div>
+        </div>
+    </div>
+
+    <script>
+        // MapAssembler and supporting classes taken from original node script
+        class Header {
+            constructor() {
+                this.verticesOffset = 0;
+                this.version = 0;
+                this.sectorsOffset = 0;
+                this.facesOffset = 0;
+                this.faceTextureMapsOffset = 0;
+                this.mapMetadataOffset = 0;
+                this.verticesOffsetRepeat = 0;
+                this.signature = "";
+                this.midPlatformsSection = 0;
+                this.section7Size = 0;
+                this.verticesSectionSize = 0;
+                this.objectsSectionSize = 0;
+                this.footerSize = 0;
+                this.commandsSectionSize = 0;
+                this.sectorCount = 0;
+            }
+
+            toString() {
+                return `Header:
+                    VERTICES_OFFSET: 0x${this.verticesOffset.toString(16).padStart(4, '0')}
+                    VERSION: 0x${this.version.toString(16).padStart(4, '0')}
+                    SECTORS_OFFSET: 0x${this.sectorsOffset.toString(16).padStart(4, '0')}
+                    FACES_OFFSET: 0x${this.facesOffset.toString(16).padStart(4, '0')}
+                    FACE_TEXTURE_MAPS_OFFSET: 0x${this.faceTextureMapsOffset.toString(16).padStart(4, '0')}
+                    MAP_METADATA_OFFSET: 0x${this.mapMetadataOffset.toString(16).padStart(4, '0')}
+                    VERTICES_OFFSET_REPEAT: 0x${this.verticesOffsetRepeat.toString(16).padStart(4, '0')}
+                    SIGNATURE: "${this.signature}" (0x${this.signature.charCodeAt(0)?.toString(16)}${this.signature.charCodeAt(1)?.toString(16)})
+                    MID_PLATFORMS_SECTION: 0x${this.midPlatformsSection.toString(16).padStart(4, '0')}
+                    SECTION_7_SIZE: 0x${this.section7Size.toString(16).padStart(4, '0')}
+                    VERTICES_SECTION_SIZE: 0x${this.verticesSectionSize.toString(16).padStart(4, '0')}
+                    OBJECTS_SECTION_SIZE: 0x${this.objectsSectionSize.toString(16).padStart(4, '0')}
+                    FOOTER_SIZE: 0x${this.footerSize.toString(16).padStart(4, '0')}
+                    COMMANDS_SECTION_SIZE: 0x${this.commandsSectionSize.toString(16).padStart(4, '0')}
+                    SECTOR_COUNT: 0x${this.sectorCount.toString(16).padStart(4, '0')}`;
+            }
+        }
+
+        class SectorsSection {
+            constructor() {
+                this.sectors = [];
+                this.offsetMap = {};
+                this.faceCount = 0;
+            }
+        }
+
+        class Sector {
+            sectorIndex;
+            
+            constructor(
+                ceilingHeight = 0x0000,
+                floorHeight = 0x0000,
+                unk0x04 = 0x0000,
+                ceilingTextureIndex = 0x0000,
+                floorTextureIndex = 0x0000,
+                textureFit = 0x00,
+                lighting = 0x00,
+                unk0x0C = 0x00,
+                facesCount = 0x00,
+                firstFaceOffset = 0x0000,
+                ceilingTextureShiftX = 0x00,
+                ceilingTextureShiftY = 0x00,
+                floorTextureShiftX = 0x00,
+                floorTextureShiftY = 0x00,
+                unk0x14 = 0x0000,
+                unk0x16 = 0x0000,
+                intermediateFloorOffset = 0x0000,
+            ) {
+                this.ceilingHeight = ceilingHeight;
+                this.floorHeight = floorHeight;
+                this.unk0x04 = unk0x04;
+                this.ceilingTextureIndex = ceilingTextureIndex;
+                this.floorTextureIndex = floorTextureIndex;
+                this.textureFit = textureFit;
+                this.lighting = lighting;
+                this.unk0x0C = unk0x0C;
+                this.facesCount = facesCount;
+                this.firstFaceOffset = firstFaceOffset;
+                this.ceilingTextureShiftX = ceilingTextureShiftX;
+                this.ceilingTextureShiftY = ceilingTextureShiftY;
+                this.floorTextureShiftX = floorTextureShiftX;
+                this.floorTextureShiftY = floorTextureShiftY;
+                this.unk0x14 = unk0x14;
+                this.unk0x16 = unk0x16;
+                this.intermediateFloorOffset = intermediateFloorOffset;
+                this.selfOffset = undefined;
+                this.faces = [];
+                this.intermediateFloor = undefined;
+                this.associatedObjectContainer = undefined;
+            }
+        }
+
+        class FacesSection {
+            constructor() {
+                this.faces = [];
+                this.offsetMap = {};
+                this.faceTextureMappingCount = 0;
+            }
+        }
+
+        class Face {
+            constructor(
+                vertexOffset01 = 0x0000,
+                vertexOffset02 = 0x0000,
+                textureMappingOffset = 0x0000,
+                sectorOffset = 0x0000,
+                sisterFaceOffset = 0x0000,
+                unk0x0A = 0x0000,
+            ) {
+                this.vertexOffset01 = vertexOffset01;
+                this.vertexOffset02 = vertexOffset02;
+                this.textureMappingOffset = textureMappingOffset;
+                this.sectorOffset = sectorOffset;
+                this.sisterFaceOffset = sisterFaceOffset;
+                this.unk0x0A = unk0x0A;
+                this.selfOffset = undefined;
+                this.vertex1 = undefined;
+                this.vertex2 = undefined;
+                this.faceTextureMapping = undefined;
+                this.sector = undefined;
+                this.sisterFace = undefined;
+            }
+        }
+
+        class FaceTextureMappingSection {
+            constructor() {
+                this.mappings = [];
+                this.offsetMap = {};
+            }
+        }
+
+        class FaceTextureMapping {
+            constructor(
+                unk0x00 = 0x00,
+                type = 0x00,
+                midTextureIndex = 0x0000,
+                upperTextureIndex = 0x0000,
+                lowerTextureIndex = 0x0000,
+                unk0x08 = 0x0000,
+                additionalMetadata = undefined,
+            ) {
+                this.unk0x00 = unk0x00;
+                this.type = type;
+                this.midTextureIndex = midTextureIndex;
+                this.upperTextureIndex = upperTextureIndex;
+                this.lowerTextureIndex = lowerTextureIndex;
+                this.unk0x08 = unk0x08;
+                this.additionalMetadata = additionalMetadata;
+                this.selfOffset = undefined;
+            }
+        }
+
+        class MidPlatformsSection {
+            constructor() {
+                this.count = 0;
+                this.platforms = [];
+                this.offsetMap = {};
+            }
+        }
+
+        class MidPlatform {
+            constructor(
+                ceilingTextureIndex = 0x0000,
+                ceilingHeight = 0x0000,
+                unk0x04 = 0x0000,
+                floorTextureIndex = 0x0000,
+                floorHeight = 0x0000,
+                unk0x0A = 0x0000,
+                unk0x0C = 0x0000,
+            ) {
+                this.ceilingTextureIndex = ceilingTextureIndex;
+                this.ceilingHeight = ceilingHeight;
+                this.unk0x04 = unk0x04;
+                this.floorTextureIndex = floorTextureIndex;
+                this.floorHeight = floorHeight;
+                this.unk0x0A = unk0x0A;
+                this.unk0x0C = unk0x0C;
+                this.selfOffset = undefined;
+                this.associatedSectors = [];
+            }
+        }
+
+        class MapMetadataSection {
+            constructor(
+                initPosX = 0x0000,
+                initPosZ = 0x0000,
+                initPosY = 0x0000,
+                rotation = 0x0000,
+                moveSpeed = 0x0000,
+                playerHeight = 0x0000,
+                maxClimb = 0x0000,
+                minFit = 0x0000,
+                unk0x10 = 0x0000,
+                candleGlow = 0x0000,
+                lightAmbience = 0x0000,
+                unk0x16 = 0x0000,
+                skyTexture = 0x0000,
+                unk0x1A = 0x0000,
+            ) {
+                this.initPosX = initPosX;
+                this.initPosZ = initPosZ;
+                this.initPosY = initPosY;
+                this.rotation = rotation;
+                this.moveSpeed = moveSpeed;
+                this.playerHeight = playerHeight;
+                this.maxClimb = maxClimb;
+                this.minFit = minFit;
+                this.unk0x10 = unk0x10;
+                this.candleGlow = candleGlow;
+                this.lightAmbience = lightAmbience;
+                this.unk0x16 = unk0x16;
+                this.skyTexture = skyTexture;
+                this.unk0x1A = unk0x1A;
+            }
+        }
+
+        class VerticesSection {
+            constructor() {
+                this.header = undefined;
+                this.vertices = [];
+                this.offsetMap = {};
+                this.relativeOffsetMap = {};
+            }
+        }
+
+        class Vertex {
+            constructor(
+                unk0x00 = 0x0000,
+                unk0x02 = 0x0000,
+                unk0x04 = 0x0000,
+                unk0x06 = 0x0000,
+                posX = 0x0000,
+                posY = 0x0000,
+            ) {
+                this.unk0x00 = unk0x00;
+                this.unk0x02 = unk0x02;
+                this.unk0x04 = unk0x04;
+                this.unk0x06 = unk0x06;
+                this.posX = posX;
+                this.posY = posY;
+                this.selfOffset = undefined;
+                this.selfRelativeOffset = undefined;
+            }
+        }
+
+        class CommandsSection {
+            constructor() {
+                this.header = undefined;
+                this.commandCategoriesSection = new Array(15).fill({ category: 0, count: 0 });
+                this.commands = [];
+                this.offsetMap = {};
+                this.relativeOffsetMap = {};
+                this.commandEntryPointsOffsets = [];
+                this.commandEntryPoints = [];
+            }
+        }
+
+        class Command {
+            constructor(
+                rawCommand,
+                size,
+                typeA,
+                typeB,
+                nextCommandIndex,
+                remainingArgs,
+            ) {
+                this.rawCommand = rawCommand;
+                this.size = size;
+                this.typeA = typeA;
+                this.typeB = typeB;
+                this.nextCommandIndex = nextCommandIndex;
+                this.remainingArgs = remainingArgs;
+                this.selfOffset = undefined;
+                this.nextCommand = undefined;
+                this.commandsThatCallThis = [];
+                this.adjustedIndexInFile = undefined;
+            }
+        }
+
+        class Section7 {
+            constructor() {
+                this.header = undefined;
+                this.unkArray01 = [];
+                this.unkArray02 = undefined;
+            }
+        }
+
+        class UnkObject01 {
+            constructor(
+                unk0x00 = 0x0000,
+                unk0x02 = 0x0000,
+                unk0x04 = 0x0000,
+                unk0x06 = 0x0000,
+                unk0x08 = 0x0000,
+                unk0x0A = 0x0000,
+                unk0x0C = 0x0000,
+                unk0x0E = 0x0000,
+                unk0x10 = 0x0000,
+            ) {
+                this.unk0x00 = unk0x00;
+                this.unk0x02 = unk0x02;
+                this.unk0x04 = unk0x04;
+                this.unk0x06 = unk0x06;
+                this.unk0x08 = unk0x08;
+                this.unk0x0A = unk0x0A;
+                this.unk0x0C = unk0x0C;
+                this.unk0x0E = unk0x0E;
+                this.unk0x10 = unk0x10;
+                this.selfOffset = undefined;
+            }
+        }
+
+        class UnkObject02 {
+            constructor(
+                unk0x00 = 0x0000,
+                unk0x02 = 0x0000,
+                unk0x04 = 0x0000,
+                unk0x06 = 0x0000,
+                unk0x08 = 0x0000,
+                unk0x0A = 0x0000,
+                unk0x0C = 0x0000,
+                unk0x0E = 0x0000,
+                unk0x10 = 0x0000,
+                unk0x12 = 0x0000,
+                unk0x14 = 0x0000,
+                unk0x16 = 0x0000,
+                unk0x18 = 0x0000,
+                unk0x1A = 0x0000,
+                unk0x1C = 0x0000,
+                unk0x1E = 0x0000,
+            ) {
+                this.unk0x00 = unk0x00;
+                this.unk0x02 = unk0x02;
+                this.unk0x04 = unk0x04;
+                this.unk0x06 = unk0x06;
+                this.unk0x08 = unk0x08;
+                this.unk0x0A = unk0x0A;
+                this.unk0x0C = unk0x0C;
+                this.unk0x0E = unk0x0E;
+                this.unk0x10 = unk0x10;
+                this.unk0x12 = unk0x12;
+                this.unk0x14 = unk0x14;
+                this.unk0x16 = unk0x16;
+                this.unk0x18 = unk0x18;
+                this.unk0x1A = unk0x1A;
+                this.unk0x1C = unk0x1C;
+                this.unk0x1E = unk0x1E;
+                this.selfOffset = undefined;
+            }
+        }
+
+        class ObjectsSection {
+            constructor() {
+                this.selfOffset = undefined;
+                this.selfRelativeOffset = undefined;
+                this.size = 0;
+                this.sectorObjectMapping = [];
+                this.objectContainers = [];
+            }
+        }
+
+        class ObjectContainer {
+            constructor() {
+                this.selfRelativeOffset = undefined;
+                this.selfOffset = undefined;
+                this.associatedSector = undefined;
+                this.count = 0;
+                this.countRepeat = 0;
+                this.objects = [];
+            }
+        }
+
+        class GameObject {
+            constructor(
+                posX = 0x0000,
+                posY = 0x0000,
+                textureIndex = 0x00,
+                textureSource = 0x00,
+                rotation = 0x00,
+                unk0x07 = 0x00,
+                lighting = 0x00,
+                renderType = 0x00,
+                posZ = 0x0000,
+                unk0x0C = 0x0000,
+                unk0x0E = 0x0000,
+            ) {
+                this.posX = posX;
+                this.posY = posY;
+                this.textureIndex = textureIndex;
+                this.textureSource = textureSource;
+                this.rotation = rotation;
+                this.unk0x07 = unk0x07;
+                this.lighting = lighting;
+                this.renderType = renderType;
+                this.posZ = posZ;
+                this.unk0x0C = unk0x0C;
+                this.unk0x0E = unk0x0E;
+                this.selfOffset = undefined;
+                this.container = undefined;
+            }
+        }
+
+        class MapAssembler {
+            constructor(fileBuffer, mapName) {
+                this.fileBuffer = fileBuffer;
+                this.mapName = mapName;
+
+                this.header = new Header();
+                this.sectorsSection = new SectorsSection();
+                this.facesSection = new FacesSection();
+                this.faceTextureMappingSection = new FaceTextureMappingSection();
+                this.mapMetadataSection = new MapMetadataSection();
+                this.verticesSection = new VerticesSection();
+                this.commandsSection = new CommandsSection();
+                this.section7 = new Section7();
+                this.objectsSection = new ObjectsSection();
+                this.footer = 0n;
+
+                this.parseFile();
+                this.applyRemainingRelations();
+            }
+
+            parseFile() {
+                this.parseHeader();
+                this.confirmFileSize();
+                this.parseSectorsSection();
+                this.parseFacesSection();
+                this.parseFaceTextureMappingSection();
+                this.parseMidPlatformSection();
+                this.parseMapMetadata();
+                this.parseVerticesSection();
+                this.parseCommandsSection();
+                this.parseSection7();
+                this.parseObjectsSection();
+                this.parseFooter();
+            }
+
+            parseHeader() {
+                if (this.fileBuffer.byteLength < 0x1E) {
+                    throw new Error(`File is too small: ${this.fileBuffer.byteLength} bytes. Header requires at least 30 bytes.`);
+                }
+
+                const view = new DataView(this.fileBuffer);
+                this.header.verticesOffset = view.getUint16(0x00, true);
+                this.header.version = view.getUint16(0x02, true);
+                this.header.sectorsOffset = view.getUint16(0x04, true);
+                this.header.facesOffset = view.getUint16(0x06, true);
+                this.header.faceTextureMapsOffset = view.getUint16(0x08, true);
+                this.header.mapMetadataOffset = view.getUint16(0x0A, true);
+                this.header.verticesOffsetRepeat = view.getUint16(0x0C, true);
+                
+                // Read signature as ASCII
+                let signatureBytes = new Uint8Array(this.fileBuffer.slice(0x0E, 0x10));
+                this.header.signature = String.fromCharCode(...signatureBytes);
+                
+                this.header.midPlatformsSection = view.getUint16(0x10, true);
+                this.header.section7Size = view.getUint16(0x12, true);
+                this.header.verticesSectionSize = view.getUint16(0x14, true);
+                this.header.objectsSectionSize = view.getUint16(0x16, true);
+                this.header.footerSize = view.getUint16(0x18, true);
+                this.header.commandsSectionSize = view.getUint16(0x1A, true);
+                this.header.sectorCount = view.getUint16(0x1C, true);
+            }
+
+            confirmFileSize() {
+                const expectedFileSize = this.header.verticesOffset + this.header.verticesSectionSize + 
+                    this.header.commandsSectionSize + this.header.section7Size + 
+                    this.header.objectsSectionSize + this.header.footerSize;
+                
+                if (expectedFileSize !== this.fileBuffer.byteLength) {
+                    throw new Error(`Section sizes in header do not correlate to actual file size. Expected size: ${expectedFileSize}. Actual size: ${this.fileBuffer.byteLength}`);
+                }
+            }
+
+            parseSectorsSection() {
+                let currentPosition = this.header.sectorsOffset;
+                this.sectorsSection.sectors = [];
+                this.sectorsSection.offsetMap = {};
+                const view = new DataView(this.fileBuffer);
+                
+                for (let i = 0; i < this.header.sectorCount; i++) {
+                    const sector = new Sector(
+                        view.getInt16(currentPosition, true),          // ceilingHeight
+                        view.getInt16(currentPosition + 0x02, true),   // floorHeight
+                        view.getUint16(currentPosition + 0x04, true),  // unk0x04
+                        view.getUint16(currentPosition + 0x06, true),  // ceilingTextureIndex
+                        view.getUint16(currentPosition + 0x08, true),  // floorTextureIndex
+                        view.getUint8(currentPosition + 0x0A),         // textureFit
+                        view.getUint8(currentPosition + 0x0B),         // lighting
+                        view.getUint8(currentPosition + 0x0C),         // unk0x0C
+                        view.getUint8(currentPosition + 0x0D),         // facesCount
+                        view.getUint16(currentPosition + 0x0E, true),  // firstFaceOffset
+                        view.getInt8(currentPosition + 0x10),          // ceilingTextureShiftX
+                        view.getInt8(currentPosition + 0x11),          // ceilingTextureShiftY
+                        view.getInt8(currentPosition + 0x12),          // floorTextureShiftX
+                        view.getInt8(currentPosition + 0x13),          // floorTextureShiftY
+                        view.getUint16(currentPosition + 0x14, true),  // unk0x14
+                        view.getUint16(currentPosition + 0x16, true),  // unk0x16
+                        view.getUint16(currentPosition + 0x18, true),  // intermediateFloorOffset
+                    );
+
+                    sector.selfOffset = currentPosition;
+                    sector.sectorIndex = i;
+                    this.sectorsSection.sectors.push(sector);
+                    this.sectorsSection.offsetMap[currentPosition] = sector;
+
+                    currentPosition += 0x1A;
+                }
+                this.sectorsSection.faceCount = view.getUint16(currentPosition, true);
+            }
+
+            parseFacesSection() {
+                let currentPosition = this.header.facesOffset;
+                this.facesSection.faces = [];
+                this.facesSection.offsetMap = {};
+                const view = new DataView(this.fileBuffer);
+                
+                for (let i = 0; i < this.sectorsSection.faceCount; i++) {
+                    const face = new Face(
+                        view.getUint16(currentPosition, true),         // vertexOffset01
+                        view.getUint16(currentPosition + 0x02, true),  // vertexOffset02
+                        view.getUint16(currentPosition + 0x04, true),  // textureMappingOffset
+                        view.getUint16(currentPosition + 0x06, true),  // sectorOffset
+                        view.getUint16(currentPosition + 0x08, true),  // sisterFaceOffset
+                        view.getUint16(currentPosition + 0x0A, true),  // unk0x0A
+                    );
+
+                    face.selfOffset = currentPosition;
+                    this.facesSection.faces.push(face);
+                    this.facesSection.offsetMap[currentPosition] = face;
+
+                    currentPosition += 0x0C;
+                }
+                this.facesSection.faceTextureMappingCount = view.getUint16(currentPosition, true);
+            }
+
+            parseFaceTextureMappingSection() {
+                let currentPosition = this.header.faceTextureMapsOffset;
+                this.faceTextureMappingSection.mappings = [];
+                this.faceTextureMappingSection.offsetMap = {};
+                const view = new DataView(this.fileBuffer);
+                
+                for (let i = 0; i < this.facesSection.faceTextureMappingCount; i++) {
+                    const type = view.getUint8(currentPosition + 0x01);
+                    let extraData = undefined;
+                    
+                    if (type >= 0x80) {
+                        extraData = {
+                            shiftTextureX: view.getInt8(currentPosition + 0x0A),
+                            shiftTextureY: view.getInt8(currentPosition + 0x0B),
+                            unk0x0C: view.getUint16(currentPosition + 0x0C, true),
+                        };
+                    }
+                    
+                    const faceTexturingMapping = new FaceTextureMapping(
+                        view.getUint8(currentPosition),                // unk0x00
+                        type,                                         // type
+                        view.getUint16(currentPosition + 0x02, true),  // midTextureIndex
+                        view.getUint16(currentPosition + 0x04, true),  // upperTextureIndex
+                        view.getUint16(currentPosition + 0x06, true),  // lowerTextureIndex
+                        view.getUint16(currentPosition + 0x08, true),  // unk0x08
+                        extraData,
+                    );
+
+                    faceTexturingMapping.selfOffset = currentPosition;
+                    this.faceTextureMappingSection.mappings.push(faceTexturingMapping);
+                    this.faceTextureMappingSection.offsetMap[currentPosition] = faceTexturingMapping;
+
+                    currentPosition += 0x0A;
+                    if (extraData) {
+                        currentPosition += 0x04;
+                    }
+                }
+            }
+
+            parseMidPlatformSection() {
+                if (this.header.midPlatformsSection === 0x0000) {
+                    return;
+                }
+
+                let currentPosition = this.header.midPlatformsSection - 0x02;
+                this.midPlatformsSection = new MidPlatformsSection();
+                const view = new DataView(this.fileBuffer);
+                
+                this.midPlatformsSection.count = view.getUint16(currentPosition, true);
+                currentPosition += 0x02;
+
+                for (let i = 0; i < this.midPlatformsSection.count; i++) {
+                    const midPlatform = new MidPlatform(
+                        view.getUint16(currentPosition, true),        // ceilingTextureIndex
+                        view.getInt16(currentPosition + 0x02, true),  // ceilingHeight
+                        view.getUint16(currentPosition + 0x04, true), // unk0x04
+                        view.getUint16(currentPosition + 0x06, true), // floorTextureIndex
+                        view.getInt16(currentPosition + 0x08, true),  // floorHeight
+                        view.getUint16(currentPosition + 0x0A, true), // unk0x0A
+                        view.getUint16(currentPosition + 0x0C, true), // unk0x0C
+                    );
+
+                    midPlatform.selfOffset = currentPosition;
+                    this.midPlatformsSection.platforms.push(midPlatform);
+                    this.midPlatformsSection.offsetMap[currentPosition] = midPlatform;
+
+                    currentPosition += 0x0E;
+                }
+            }
+
+            parseMapMetadata() {
+                const currentPosition = this.header.mapMetadataOffset;
+                const view = new DataView(this.fileBuffer);
+                
+                this.mapMetadataSection = new MapMetadataSection(
+                    view.getInt16(currentPosition, true),           // initPosX
+                    view.getInt16(currentPosition + 0x02, true),    // initPosZ
+                    view.getInt16(currentPosition + 0x04, true),    // initPosY
+                    view.getInt16(currentPosition + 0x06, true),    // rotation
+                    view.getUint16(currentPosition + 0x08, true),   // moveSpeed
+                    view.getUint16(currentPosition + 0x0A, true),   // playerHeight
+                    view.getUint16(currentPosition + 0x0C, true),   // maxClimb
+                    view.getUint16(currentPosition + 0x0E, true),   // minFit
+                    view.getUint16(currentPosition + 0x10, true),   // unk0x10
+                    view.getInt16(currentPosition + 0x12, true),    // candleGlow
+                    view.getUint16(currentPosition + 0x14, true),   // lightAmbience
+                    view.getUint16(currentPosition + 0x16, true),   // unk0x16
+                    view.getUint16(currentPosition + 0x18, true),   // skyTexture
+                    view.getUint16(currentPosition + 0x1A, true),   // unk0x1A
+                );
+            }
+
+            parseVerticesSection() {
+                let currentPosition = this.header.verticesOffset;
+                const view = new DataView(this.fileBuffer);
+                
+                this.verticesSection.header = {
+                    sectionSize: view.getUint16(currentPosition, true),
+                    sectionHeaderSize: view.getUint16(currentPosition + 0x02, true),
+                    unk0x04: view.getUint16(currentPosition + 0x04, true),
+                    verticesCount: view.getUint16(currentPosition + 0x06, true),
+                };
+                
+                currentPosition += 0x08;
+                this.verticesSection.vertices = [];
+                this.verticesSection.offsetMap = {};
+                this.verticesSection.relativeOffsetMap = {};
+
+                for (let i = 0; i < this.verticesSection.header.verticesCount; i++) {
+                    const vertex = new Vertex(
+                        view.getInt16(currentPosition, true),           // unk0x00
+                        view.getInt16(currentPosition + 0x02, true),    // unk0x02
+                        view.getInt16(currentPosition + 0x04, true),    // unk0x04
+                        view.getInt16(currentPosition + 0x06, true),    // unk0x06
+                        view.getInt16(currentPosition + 0x08, true),    // posX
+                        view.getInt16(currentPosition + 0x0A, true),    // posY
+                    );
+
+                    vertex.selfOffset = currentPosition;
+                    vertex.selfRelativeOffset = currentPosition - this.header.verticesOffset;
+                    this.verticesSection.vertices.push(vertex);
+                    this.verticesSection.offsetMap[vertex.selfOffset] = vertex;
+                    this.verticesSection.relativeOffsetMap[vertex.selfRelativeOffset] = vertex;
+
+                    currentPosition += 0x0C;
+                }
+            }
+
+            // Providing just simplified versions of the remaining parsing methods
+            // since they're not directly needed for the 2D visualization
+            parseCommandsSection() {
+                // Simplified command section parsing
+                const commandSectionStart = this.header.verticesOffset + this.header.verticesSectionSize;
+                this.commandsSection.header = { 
+                    signature: "", 
+                    unk0x02: 0, 
+                    relativeOffsetToCommands: 0, 
+                    commandCount: 0 
+                };
+            }
+
+            parseSection7() {
+                // Simplified section7 parsing
+                this.section7.header = { size_a: 0, count: 0 };
+            }
+
+            parseObjectsSection() {
+                // Simplified objects section parsing
+                this.objectsSection.size = 0;
+            }
+
+            parseFooter() {
+                // Simplified footer parsing
+                this.footer = 0n;
+            }
+
+            applyRemainingRelations() {
+                // Connect sectors to their faces
+                for (const sector of this.sectorsSection.sectors) {
+                    if (sector.intermediateFloorOffset > 0x0000 && this.midPlatformsSection) {
+                        const midPlatform = this.midPlatformsSection.offsetMap[sector.intermediateFloorOffset];
+                        if (midPlatform) {
+                            sector.intermediateFloor = midPlatform;
+                            midPlatform.associatedSectors.push(sector);
+                        }
+                    }
+                    
+                    sector.faces = [];
+                    for (let i = 0; i < sector.facesCount; i++) {
+                        const face = this.facesSection.offsetMap[sector.firstFaceOffset + 0x0C * i];
+                        if (face) {
+                            face.sector = sector;
+                            sector.faces.push(face);
+                        }
+                    }
+                }
+
+                // Connect faces to their vertices and sister faces
+                for (const face of this.facesSection.faces) {
+                    const vertex1 = this.verticesSection.relativeOffsetMap[face.vertexOffset01];
+                    if (vertex1) {
+                        face.vertex1 = vertex1;
+                    }
+
+                    const vertex2 = this.verticesSection.relativeOffsetMap[face.vertexOffset02];
+                    if (vertex2) {
+                        face.vertex2 = vertex2;
+                    }
+
+                    const faceTextureMapping = this.faceTextureMappingSection.offsetMap[face.textureMappingOffset];
+                    if (faceTextureMapping) {
+                        face.faceTextureMapping = faceTextureMapping;
+                    }
+
+                    if (face.sisterFaceOffset !== 0xFFFF && face.sisterFaceOffset !== 0x0000) {
+                        const sisterFace = this.facesSection.offsetMap[face.sisterFaceOffset];
+                        if (sisterFace) {
+                            face.sisterFace = sisterFace;
+                        }
+                    }
+                }
+            }
+        }
+
+        // The main JavaScript for the map renderer
+        const statusElement = document.getElementById('status');
+        const mapInfoElement = document.getElementById('mapInfo');
+        const mapSelectElement = document.getElementById('mapSelect');
+        const mapCanvas = document.getElementById('mapCanvas');
+        const ctx = mapCanvas.getContext('2d');
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('fileInput');
+
+        // Track the loaded maps
+        let maps = [];
+        let currentMap = null;
+        let showBspDividers = false;
+        let hoveredFace = null;
+        let hoveredSector = null;
+
+        // Camera/view state
+        let cameraOffset = { x: 0, y: 0 };
+        let scale = 1;
+        let isDragging = false;
+        let lastMousePos = { x: 0, y: 0 };
+
+        // Initialize the canvas size
+        function resizeCanvas() {
+            const container = mapCanvas.parentElement;
+            mapCanvas.width = container.clientWidth;
+            mapCanvas.height = container.clientHeight;
+            if (currentMap) {
+                renderMap();
+            }
+        }
+
+        // Handle mouse events for panning
+        mapCanvas.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            lastMousePos = { x: e.clientX, y: e.clientY };
+        });
+
+        mapCanvas.addEventListener('mousemove', (e) => {
+            if (isDragging) {
+                const dx = e.clientX - lastMousePos.x;
+                const dy = e.clientY - lastMousePos.y;
+                
+                cameraOffset.x += dx / scale;
+                cameraOffset.y += dy / scale;
+                
+                lastMousePos = { x: e.clientX, y: e.clientY };
+                renderMap();
+                return;
+            }
+            
+            // Get mouse position in world coordinates
+            const rect = mapCanvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            
+            // Transform to world coordinates
+            const worldX = (mouseX / scale) - cameraOffset.x;
+            const worldY = (mouseY / scale) - cameraOffset.y;
+            
+            // Apply horizontal flip correction for hover detection
+            const correctedWorldX = -worldX; // Flip X coordinate
+            
+            checkHover(correctedWorldX, worldY);
+            
+            // Update tooltip position
+            const tooltip = document.getElementById('tooltip');
+            tooltip.style.left = (mouseX + 15) + 'px';
+            tooltip.style.top = (mouseY + 15) + 'px';
+        });
+
+        mapCanvas.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
+
+        mapCanvas.addEventListener('mouseleave', () => {
+            isDragging = false;
+        });
+
+        // Handle wheel events for zooming
+        mapCanvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            
+            const mouseX = e.clientX - mapCanvas.getBoundingClientRect().left;
+            const mouseY = e.clientY - mapCanvas.getBoundingClientRect().top;
+            
+            const worldX = (mouseX / scale) - cameraOffset.x;
+            const worldY = (mouseY / scale) - cameraOffset.y;
+            
+            const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+            scale *= zoomFactor;
+            
+            cameraOffset.x = -(worldX * scale - mouseX) / scale;
+            cameraOffset.y = -(worldY * scale - mouseY) / scale;
+            
+            renderMap();
+        });
+
+        // Handle UI controls
+        document.getElementById('zoomIn').addEventListener('click', () => {
+            scale *= 1.2;
+            renderMap();
+        });
+
+        document.getElementById('zoomOut').addEventListener('click', () => {
+            scale *= 0.8;
+            renderMap();
+        });
+
+        document.getElementById('resetView').addEventListener('click', () => {
+            resetView();
+        });
+
+        document.getElementById('toggleWalls').addEventListener('click', () => {
+            showBspDividers = !showBspDividers;
+            renderMap();
+        });
+
+        mapSelectElement.addEventListener('change', () => {
+            const mapIndex = mapSelectElement.value;
+            if (mapIndex !== '') {
+                currentMap = maps[mapIndex];
+                resetView();
+            }
+        });
+
+        // Initialize the drop zone
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            
+            if (e.dataTransfer.files.length > 0) {
+                handleFiles(e.dataTransfer.files);
+            }
+        });
+
+        dropZone.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length > 0) {
+                handleFiles(fileInput.files);
+            }
+        });
+
+        // Process the selected files
+        async function handleFiles(files) {
+            maps = [];
+            mapSelectElement.innerHTML = '';
+            
+            statusElement.textContent = `Loading ${files.length} files...`;
+            
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                if (file.name.toLowerCase().endsWith('.raw')) {
+                    try {
+                        const arrayBuffer = await file.arrayBuffer();
+                        const mapName = file.name.split('.')[0];
+                        const map = new MapAssembler(arrayBuffer, mapName);
+                        maps.push(map);
+                        
+                        const option = document.createElement('option');
+                        option.value = maps.length - 1;
+                        option.textContent = mapName;
+                        mapSelectElement.appendChild(option);
+                        
+                        statusElement.textContent = `Loaded ${i + 1}/${files.length} files...`;
+                    } catch (error) {
+                        console.error(`Error loading ${file.name}:`, error);
+                        statusElement.textContent += `\nError loading ${file.name}: ${error.message}`;
+                    }
+                }
+            }
+            
+            if (maps.length > 0) {
+                maps.sort();
+                mapSelectElement.value = 0;
+                currentMap = maps[0];
+                statusElement.textContent = `Loaded ${maps.length} maps successfully.`;
+                resetView();
+            } else {
+                statusElement.textContent = 'No valid map files found.';
+            }
+        }
+
+        // Reset the view to fit the current map
+        function resetView() {
+            if (!currentMap) return;
+            
+            // Find map bounds
+            const bounds = calculateMapBounds(currentMap);
+            const padding = 50;
+            
+            // Calculate scale to fit map in viewport
+            const scaleX = (mapCanvas.width - padding * 2) / (bounds.maxX - bounds.minX);
+            const scaleY = (mapCanvas.height - padding * 2) / (bounds.maxY - bounds.minY);
+            scale = Math.min(scaleX, scaleY);
+            
+            // Center the map
+            const centerX = (bounds.minX + bounds.maxX) / 2;
+            const centerY = (bounds.minY + bounds.maxY) / 2;
+            
+            cameraOffset.x = mapCanvas.width / (2 * scale) - centerX;
+            cameraOffset.y = mapCanvas.height / (2 * scale) - centerY;
+            
+            updateMapInfo();
+            renderMap();
+        }
+
+        // Calculate the bounds of the map for centering
+        function calculateMapBounds(map) {
+            const vertices = map.verticesSection.vertices;
+            if (vertices.length === 0) {
+                return { minX: -100, maxX: 100, minY: -100, maxY: 100 };
+            }
+            
+            let minX = Infinity;
+            let maxX = -Infinity;
+            let minY = Infinity;
+            let maxY = -Infinity;
+            
+            for (const vertex of vertices) {
+                minX = Math.min(minX, vertex.posX);
+                maxX = Math.max(maxX, vertex.posX);
+                minY = Math.min(minY, vertex.posY);
+                maxY = Math.max(maxY, vertex.posY);
+            }
+            
+            return { minX, maxX, minY, maxY };
+        }
+
+        // Update map information display
+        function updateMapInfo() {
+            if (!currentMap) {
+                mapInfoElement.textContent = 'No map selected';
+                return;
+            }
+            
+            const map = currentMap;
+            const sectors = map.sectorsSection.sectors.length;
+            const faces = map.facesSection.faces.length;
+            const vertices = map.verticesSection.vertices.length;
+            
+            mapInfoElement.innerHTML = `
+                <p><strong>Map Name:</strong> ${map.mapName}</p>
+                <p><strong>Sectors:</strong> ${sectors}</p>
+                <p><strong>Faces:</strong> ${faces}</p>
+                <p><strong>Vertices:</strong> ${vertices}</p>
+                <p><strong>Starting Position:</strong> X: ${map.mapMetadataSection.initPosX}, Y: ${map.mapMetadataSection.initPosY}, Z: ${map.mapMetadataSection.initPosZ}</p>
+                <p><strong>Starting Rotation:</strong> ${map.mapMetadataSection.rotation}</p>
+            `;
+        }
+
+        // Render the map
+        function renderMap() {
+            if (!currentMap) return;
+            
+            // Clear the canvas
+            ctx.clearRect(0, 0, mapCanvas.width, mapCanvas.height);
+            
+            // Setup transformation
+            ctx.save();
+            ctx.translate(cameraOffset.x * scale, cameraOffset.y * scale);
+            ctx.scale(scale, scale);
+            ctx.scale(-1, 1); // Flip horizontally to correct mirrored maps
+            
+            // Get all the faces from the map
+            const faces = currentMap.facesSection.faces;
+            
+            // Draw sectors first (under faces)
+            if (currentMap.sectorsSection.sectors) {
+                for (const sector of currentMap.sectorsSection.sectors) {
+                    if (!sector.faces || sector.faces.length < 3) continue;
+                    
+                    // Draw sector if it's hovered
+                    if (hoveredSector === sector) {
+                        ctx.fillStyle = 'rgba(255, 255, 100, 0.1)';
+                        ctx.beginPath();
+                        
+                        // Find all vertices for the sector to draw polygon
+                        const sectorsVertices = getSectorVertices(sector);
+                        if (sectorsVertices.length > 2) {
+                            ctx.moveTo(sectorsVertices[0].x, sectorsVertices[0].y);
+                            for (let i = 1; i < sectorsVertices.length; i++) {
+                                ctx.lineTo(sectorsVertices[i].x, sectorsVertices[i].y);
+                            }
+                            ctx.closePath();
+                            ctx.fill();
+                        }
+                    }
+                }
+            }
+            
+            // Draw each face
+            for (const face of faces) {
+                // Skip if we don't have vertex data
+                if (!face.vertex1 || !face.vertex2) continue;
+                
+                // Determine if this is a different height divider
+                let isDifferentHeightDivider = false;
+                if (face.sisterFace && face.sector && face.sisterFace.sector) {
+                    isDifferentHeightDivider = face.sector.floorHeight !== face.sisterFace.sector.floorHeight;
+                }
+                
+                // Skip regular BSP dividers if not showing them, but always show different height dividers
+                if (!showBspDividers && face.sisterFaceOffset !== 0xFFFF && !isDifferentHeightDivider) continue;
+                
+                // Determine face color based on type
+                if (face.sisterFaceOffset !== 0xFFFF) {
+                    // We already calculated isDifferentHeightDivider above
+                    
+                    if (isDifferentHeightDivider) {
+                        ctx.strokeStyle = '#AAAAFF'; // Light blue for different height dividers
+                        ctx.lineWidth = 1.5 / scale;
+                    } else {
+                        ctx.strokeStyle = '#666666'; // Gray for regular BSP dividers
+                        ctx.lineWidth = 1 / scale;
+                    }
+                } else {
+                    ctx.strokeStyle = '#FFFFFF'; // White for real walls (changed from green)
+                    ctx.lineWidth = 2 / scale;
+                }
+                
+                // Highlight hovered face
+                if (hoveredFace === face) {
+                    ctx.strokeStyle = '#FF9900'; // Orange highlight
+                    ctx.lineWidth = (3 / scale);
+                }
+                
+                // Draw the line between vertices
+                ctx.beginPath();
+                ctx.moveTo(face.vertex1.posX, face.vertex1.posY);
+                ctx.lineTo(face.vertex2.posX, face.vertex2.posY);
+                ctx.stroke();
+            }
+            
+            // Draw starting position if available
+            if (currentMap.mapMetadataSection) {
+                const startX = currentMap.mapMetadataSection.initPosX;
+                const startY = currentMap.mapMetadataSection.initPosY;
+                
+                // Draw player position as a circle
+                ctx.fillStyle = '#FF0000';
+                ctx.beginPath();
+                ctx.arc(startX, startY, 35, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Draw player direction
+                const rotation = (currentMap.mapMetadataSection.rotation / 180) * Math.PI;
+                const dirX = Math.cos(rotation) * 80;
+                const dirY = Math.sin(rotation) * 80;
+                
+                ctx.strokeStyle = '#FF0000';
+                ctx.lineWidth = 2 / scale;
+                ctx.beginPath();
+                ctx.moveTo(startX, startY);
+                ctx.lineTo(startX + dirX, startY + dirY);
+                ctx.stroke();
+            }
+            
+            ctx.restore();
+        }
+
+        // Helper functions for hover detection
+        
+        // Check if mouse is near a line segment (face)
+        function distanceToFace(mouseX, mouseY, face) {
+            if (!face.vertex1 || !face.vertex2) return Infinity;
+            
+            const x1 = face.vertex1.posX;
+            const y1 = face.vertex1.posY;
+            const x2 = face.vertex2.posX;
+            const y2 = face.vertex2.posY;
+            
+            // Vector from line segment start to end
+            const lineVecX = x2 - x1;
+            const lineVecY = y2 - y1;
+            const lineLength = Math.sqrt(lineVecX * lineVecX + lineVecY * lineVecY);
+            
+            // If the line segment has zero length, return distance to either endpoint
+            if (lineLength === 0) {
+                return Math.sqrt((mouseX - x1) * (mouseX - x1) + (mouseY - y1) * (mouseY - y1));
+            }
+            
+            // Calculate projection of mouse point onto the line
+            const t = Math.max(0, Math.min(1, ((mouseX - x1) * lineVecX + (mouseY - y1) * lineVecY) / (lineLength * lineLength)));
+            
+            // Find the nearest point on the line segment
+            const nearestX = x1 + t * lineVecX;
+            const nearestY = y1 + t * lineVecY;
+            
+            // Return distance to the nearest point
+            return Math.sqrt((mouseX - nearestX) * (mouseX - nearestX) + (mouseY - nearestY) * (mouseY - nearestY));
+        }
+        
+        // Get all vertices of a sector in order (for polygon drawing/checking)
+        function getSectorVertices(sector) {
+            if (!sector.faces || sector.faces.length === 0) return [];
+            
+            // Collect all vertices from the sector's faces
+            const vertexPairs = [];
+            for (const face of sector.faces) {
+                if (face.vertex1 && face.vertex2) {
+                    vertexPairs.push({
+                        start: { x: face.vertex1.posX, y: face.vertex1.posY },
+                        end: { x: face.vertex2.posX, y: face.vertex2.posY }
+                    });
+                }
+            }
+            
+            // Sort vertices to form a connected polygon
+            const orderedVertices = [];
+            if (vertexPairs.length > 0) {
+                orderedVertices.push(vertexPairs[0].start);
+                orderedVertices.push(vertexPairs[0].end);
+                vertexPairs.splice(0, 1);
+                
+                while (vertexPairs.length > 0) {
+                    const lastVertex = orderedVertices[orderedVertices.length - 1];
+                    let foundNext = false;
+                    
+                    for (let i = 0; i < vertexPairs.length; i++) {
+                        const pair = vertexPairs[i];
+                        
+                        // If lastVertex connects to start of pair
+                        if (approxEqual(lastVertex.x, pair.start.x) && approxEqual(lastVertex.y, pair.start.y)) {
+                            orderedVertices.push(pair.end);
+                            vertexPairs.splice(i, 1);
+                            foundNext = true;
+                            break;
+                        }
+                        // If lastVertex connects to end of pair
+                        else if (approxEqual(lastVertex.x, pair.end.x) && approxEqual(lastVertex.y, pair.end.y)) {
+                            orderedVertices.push(pair.start);
+                            vertexPairs.splice(i, 1);
+                            foundNext = true;
+                            break;
+                        }
+                    }
+                    
+                    if (!foundNext) break;
+                }
+            }
+            
+            return orderedVertices;
+        }
+        
+        // Check if two points are approximately equal
+        function approxEqual(a, b, epsilon = 0.001) {
+            return Math.abs(a - b) < epsilon;
+        }
+        
+        // Check if a point is inside a polygon (for sector selection)
+        function isPointInSector(x, y, sector) {
+            const vertices = getSectorVertices(sector);
+            if (vertices.length < 3) return false;
+            
+            let inside = false;
+            for (let i = 0, j = vertices.length - 1; i < vertices.length; j = i++) {
+                const xi = vertices[i].x, yi = vertices[i].y;
+                const xj = vertices[j].x, yj = vertices[j].y;
+                
+                const intersect = ((yi > y) != (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+                if (intersect) inside = !inside;
+            }
+            
+            return inside;
+        }
+        
+        // Check for hovering over faces or sectors
+        function checkHover(mouseX, mouseY) {
+            if (!currentMap) return;
+            
+            // Check faces first
+            let closestFace = null;
+            let minDistance = 10 / scale; // Detection threshold scaled with view
+            
+            for (const face of currentMap.facesSection.faces) {
+                // Skip BSP dividers if not showing them
+                if (!showBspDividers && face.sisterFaceOffset !== 0xFFFF) continue;
+                
+                const distance = distanceToFace(mouseX, mouseY, face);
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    closestFace = face;
+                }
+            }
+            
+            // Check sectors
+            let foundSector = null;
+            for (const sector of currentMap.sectorsSection.sectors) {
+                if (isPointInSector(mouseX, mouseY, sector)) {
+                    foundSector = sector;
+                    break;
+                }
+            }
+            
+            // Update hovered elements if changed
+            if (hoveredFace !== closestFace || hoveredSector !== foundSector) {
+                hoveredFace = closestFace;
+                hoveredSector = foundSector;
+                
+                // Update tooltip
+                const tooltip = document.getElementById('tooltip');
+                
+                if (hoveredFace) {
+                    let info = `<strong>Face Info:</strong><br>`;
+                    info += `Offset: 0x${hoveredFace.selfOffset?.toString(16).padStart(4, '0')}<br>`;
+                    info += `Vertex1 Offset: 0x${hoveredFace.vertexOffset01?.toString(16).padStart(4, '0')}<br>`;
+                    info += `Vertex2 Offset: 0x${hoveredFace.vertexOffset02?.toString(16).padStart(4, '0')}<br>`;
+                    info += `Sister Face: ${hoveredFace.sisterFaceOffset !== 0xFFFF ? '0x' + hoveredFace.sisterFaceOffset?.toString(16).padStart(4, '0') : 'None'}<br>`;
+                    info += hoveredFace.sector ? `Sector Offset: 0x${hoveredFace.sector.selfOffset?.toString(16).padStart(4, '0')}<br>` : '';
+                    
+                    tooltip.innerHTML = info;
+                    tooltip.style.display = 'block';
+                } else if (hoveredSector) {
+                    let info = `<strong>Sector Info:</strong><br>`;
+                    info += `Offset: 0x${hoveredSector.selfOffset?.toString(16).padStart(4, '0')}<br>`;
+                    info += `Index: ${hoveredSector.sectorIndex}<br>`;
+                    info += `Floor Height: ${hoveredSector.floorHeight}<br>`;
+                    info += `Ceiling Height: ${hoveredSector.ceilingHeight}<br>`;
+                    info += `Face Count: ${hoveredSector.facesCount}<br>`;
+                    info += `Lighting: ${hoveredSector.lighting}<br>`;
+                    
+                    tooltip.innerHTML = info;
+                    tooltip.style.display = 'block';
+                } else {
+                    tooltip.style.display = 'none';
+                }
+                
+                renderMap();
+            }
+        }
+        
+        // Initialize
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+    </script>
+</body>
+</html>
