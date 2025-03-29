@@ -20,6 +20,7 @@ export class Sector {
     public faces?: Face[];
     public intermediateFloor?: MidPlatform;
     public associatedObjectContainer?: ObjectContainer
+    public sectorIndex?: number;
 
     constructor(
         public ceilingHeight = 0x0000,  // signed
