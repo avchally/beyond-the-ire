@@ -15,6 +15,9 @@ Each command has the following format:
 
 There are 5,531 individual commands defined across all 44 map files.
 
+There are 1,937 command chains across all 44 map files.
+
+
 
 
 Here are all of the command types found in files:
