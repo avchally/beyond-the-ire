@@ -58,7 +58,7 @@ The sector object:
 | 0x11  | 1 (signed) | CEIL_TEXTURE_SHIFT_Y | Shifts the ceiling texture along the y-axis |
 | 0x12  | 1 (signed) | FLOOR_TEXTURE_SHIFT_X | Shifts the floor texture along the x-axis |
 | 0x13  | 1 (signed) | FLOOR_TEXTURE_SHIFT_Y | Shifts the floor texture along the y-axis |
-| 0x14  | 2 | UNK_0x14 | TODO |
+| 0x14  | 2 | FLOOR_TRIGGER_ID | The ID of an established floor trigger command. When the player walks over the sector, this floor trigger command is executed. |
 | 0x16  | 2 | UNK_0x16 | TODO (have only seen 0) |
 | 0x18  | 2 | INT_FLOOR_OFFSET | Offset to an intermediate platform that should be added to this sector |
 
@@ -301,7 +301,7 @@ And here is the object itself:
 | 0x09 | 1 | RENDER_TYPE | Determines whether to apply billboarding to the texture, i.e., whether the sprite is always facing the player or not. 0x00 applies billboarding. 0x80 makes it static. TODO see what other values do |
 | 0x0A | 2 | POS_Z | Z-coordinate of the object's position (height) |
 | 0x0C | 2 | UNK_0x0C | TODO |
-| 0x0E | 2 | UNK_0x0E | Determines interactability and ultimately what command is run when interacted with. Influences both right and left click options. TODO it somehow runs a command from the command entry point array in the commands section, but this value is not the index in or offset to the command entry point array. |
+| 0x0E | 2 | UNK_0x0E | An ID that connects to commands. A basic interact command could have an index and it should match this. A spawn item command could use this ID to spawn the item at this object's location. Previous notes: Determines interactability and ultimately what command is run when interacted with. Influences both right and left click options. TODO it somehow runs a command from the command entry point array in the commands section, but this value is not the index in or offset to the command entry point array. |
 
 ## Footer
 
