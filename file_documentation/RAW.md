@@ -198,11 +198,20 @@ The vertex object:
 
 **Starts at `HEADER.VERTICES_OFFSET + HEADER.VERTICES_SECTION_SIZE`**
 
-This section contains all of the commands that are defined for this map. 
+### Overview
+This section contains all of the commands that are defined for this map.
 
-ROTH utilizes two different scripting engines. One is defined in the DBASE100.DAT file and the other is defined within each map file. The map-based commands can perform any variety of actions on the map, such as placing/removing items, spawning enemies, switching to a different map, calling DBASE100 commands, and more.
+ROTH utilizes two different scripting engines: one is defined in the DBASE100.DAT file and the other is defined within each map file. The map-based commands can perform any variety of actions on the map, such as placing/removing items, spawning enemies, switching to a different map, calling DBASE100 commands, and more.
 
-Each command can optionally choose to call another command, resulting in a command chain. WIP: It seems the only way to run a command chain from the game is through an array of entry points, which objects in the map have access to. If the command (and therefore its resulting command chain) is not listed in the entry points array, an object cannot run it.
+Each command can optionally choose to call another command, resulting in a command chain. Additionally, a command chain always (seemingly) starts with an "entry command". Entry commands are special commands that assist in initializing the command chain and ultimately determines how the command chain is executed in the map. For example, an entry command where `COMMAND_BASE == 0x13` sets up the command chain to execute when walking over a sector.
+
+The commands section contains a simple header, a table of entry command counts, an array of entry command references, and an array of all commands. See the breakdown of the commands section below.
+
+The table of entry command counts declares how many entry commands of each category there are in the map. The section always contains 15 4 byte entries. Each entry corresponds to a given type of entry command. For example, the first entry will ALWAYS correspond to entry commands where `COMMAND_BASE == 0x08 or 0x02`. The first two bytes of the entry is a relative offset from section start to the first command in the array of entry command references. The last two bytes of the entry is a count of how many commands of that type there are. See the Entry Command Counts section below for more information.
+
+The array of entry command references is an array of 2 byte elements. Each element is a relative offset from section start to the associated command in the array of all commands. 
+
+The array of all commands defines every command in the map. See the command object below for the full breakdown.
 
 Here is the breakdown of the commands section:
 
@@ -210,21 +219,129 @@ Here is the breakdown of the commands section:
 | ----------- | ----------- | ----------- | ----------- |
 | 0x00  | 2 | SIGNATURE | Always seems to be ASCII "3u". Could represent version of scripting engine? |
 | 0x02  | 2 | UNK_0x02 | TODO |
-| 0x04  | 2 | COMMANDS_OFFSET | Offset from section start to the commands array |
+| 0x04  | 2 | COMMANDS_OFFSET | Offset from section start to the all commands array |
 | 0x06  | 2 | COMMAND_COUNT | Total number of defined commands |
-| 0x08  | 60 (0x3C) | COUNTS_SECTION | Seems to be a fixed size representing a breakdown of the counts of commands. Seems to relate to how a command can be called. (i.e., if a command is triggered by walking over a sector floor or a click interaction) |
-| 0x44  | 2 * COMMAND_COUNT | COMMAND_ENTRY_POINTS | An array of 2 byte values, that are offsets (from section start) to a command, indicating the start of a command chain. The elements here are commands that can be called by objects placed in the map. The array is the size of the total number of commands (in the case that all commands should be accessible and callable by an object), otherwise the remaining elements are just 0x0000. |
-| COMMANDS_OFFSET  | ~~ | COMMANDS | An array of command objects |
+| 0x08  | 60 (0x3C) | ENTRY_COMMAND_COUNTS | Fixed size representing a breakdown of the counts of commands based on type/category. The category relates to how a command chain is initialized and eventually executed. (i.e., if a command is triggered by walking over a sector floor or a click interaction) |
+| 0x44  | 2 * COMMAND_COUNT | ENTRY_COMMAND_REFERENCES | An array of 2 byte values, that are relative offsets from section start to a command in the all commands array, indicating the start of a command chain. The number of elements in the array is COMMAND_COUNT, but since this array only contains entry commands, most elements will be 0x0000. |
+| COMMANDS_OFFSET  | HEADER.COMMANDS_SECTION_SIZE - COMMANDS_OFFSET | ALL_COMMANDS | An array of the actual command objects |
 
 The command object is as follows:
 
 | Offset | Size (bytes) | Field | Description |
 | ----------- | ----------- | ----------- | ----------- |
 | 0x00  | 2 | SIZE | Size in bytes of the command |
-| 0x02  | 1 | TYPE_B | Additional command identifier information. Most of the time 0x00 |
-| 0x03  | 1 | TYPE_A | The actual command to run. (e.g., 0x29 is add item to inventory) |
-| 0x04  | 2 | NEXT_COMMAND | Index (1-based) of the next command to run in the chain. 0x00 ends the chain |
+| 0x02  | 1 | COMMAND_MODIFIER | Additional command identifier information. Most of the time 0x00, but other values include 0x08, 0x80, 0x88 |
+| 0x03  | 1 | COMMAND_BASE | Also referred to as "command type". The actual command to run. (e.g., 0x29 is add item to inventory, 0x13 is the entry command type for setting up a floor trigger) |
+| 0x04  | 2 | NEXT_COMMAND | Index (1-based) within the ALL_COMMANDS array of the next command to run in the chain. 0x00 ends the chain |
 | 0x06  | SIZE - 0x06 | ARGS | Array of 2 byte values that represent all required arguments for the given TYPE, e.g., for the 0x29 (add item to inventory) command, the first argument is _UNKNOWN_ and the second argument is the item ID to add to inventory |
+
+### Entry Command Counts (Categories)
+
+The table of entry command counts is a breakdown of the counts of entry commands used on the map. This helps the map to determine how each command chain should be executed (via floor/sector trigger, right clicking an object, left clicking an object, etc.).
+
+The section is a fixed 0x3C length of 15 4 byte entries. Each entry corresponds to a single entry command type/category (except for the first, which corresponds to two). Each entry will always correspond to the same category. For example, the first entry in the section will always correspond to the first category, the second to the second, and so on. The actual breakdown of the categories is found further below.
+
+Here is the category entry:
+
+| Offset | Size (bytes) | Field | Description |
+| ----------- | ----------- | ----------- | ----------- |
+| 0x00  | 2 | OFFSET_TO_FIRST_COMMAND_REFERENCE | Relative offset from the start of the commands section to the first command reference in the entry command references array. If there are no entry commands of this type, this will just be 0x0000 |
+| 0x02  | 2 | COUNT | The number of commands of this type |
+
+The game would go through each category entry and find the OFFSET_TO_FIRST_COMMAND_REFERENCE and then increment through the entry command references array until it has found the number of commands equal to COUNT. It would then go to the next category entry and repeat.
+
+Here is the breakdown of which category corresponds to which command type (COMMAND_BASE):
+
+| Offset within ENTRY_COMMAND_COUNTS | Category Number | Associated command type (COMMAND_BASE) | Additional Notes |
+| ----------- | ----------- | ----------- | ----------- |
+| 0x00 | 01 | 0x08 & 0x02 | The only category where two COMMAND_BASE's are associated with it |
+| 0x04 | 02 | UNUSED | Across all 44 map files, there are no command types that are associated with this category |
+| 0x08 | 03 | 0x03 | |
+| 0x0C | 04 | 0x13 | 0x13 is the command type to set up a floor trigger |
+| 0x10 | 05 | 0x18 | |
+| 0x14 | 06 | 0x19 | |
+| 0x18 | 07 | 0x1A | |
+| 0x1C | 08 | 0x1B | |
+| 0x20 | 09 | 0x25 | |
+| 0x24 | 10 | UNUSED | Across all 44 map files, there are no command types that are associated with this category |
+| 0x28 | 11 | 0x32 | |
+| 0x2C | 12 | 0x31 | |
+| 0x30 | 13 | 0x30 | |
+| 0x34 | 14 | 0x37 | |
+| 0x38 | 15 | 0x39 | |
+
+### All Command Types
+
+This section will be in an ongoing WIP state, but it will serve to define and document all possible commands.
+
+The COMMAND_BASE is the actual command type and determines what the command does.  
+Each command has anywhere from 0 to 8 arguments that it is called/executed with.  
+Each command can also have a COMMAND_MODIFIER. Most of the time this is 0x00, but it could also be 0x08, 0x80, 0x88, or more depending on the command. What these modifiers do is still undetermined.
+
+| COMMAND_BASE | Possible COMMAND_MODIFIER's | Size | Used as Entry Command? | Description | Arg 1 | Arg 2 | Arg 3 | Arg 4 | Arg 5 | Arg 6 | Arg 7 | Arg 8 |
+| ----------- | ----------- | ----------- | ----------- | ----------- | ----------- | ----------- | ----------- | ----------- | ----------- | ----------- | ----------- | ----------- |
+| 0x01 | 00 | 0x06 |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x02 | 00 | 0x10 | TRUE |  |  |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x03 | 00 | 0x16 | TRUE | Used more often not as entry point |  |  |  |  |  |  |  |  |
+| 0x07 | 00 | 0x14 |  |  |  |  |  |  |  |  |  | XXXXXXXXXXX |
+| 0x08 | 00 | 0x0C | TRUE |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x09 | 00 | 0x12 |  |  |  |  |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x0A | 00 | 0x10 |  |  |  |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x0C | 00 | 0x16 |  |  |  |  |  |  |  |  |  |  |
+| 0x0D | 00 | 0x0E |  |  |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x0E | 00 | 0x0C |  |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x0F | 00 | 0x0C |  |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x10 | 00 | 0x0A |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x11 | 00 | 0x0C |  |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x12 | 00 | 0x08 |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x13 | 00 | 0x0C | TRUE | Establishes a floor trigger. A sector specifies if it's associated with a floor trigger via the "self-assigned" ID (argument 2). Starts many CC's. Precedes a change map command (0x3B00). Is used in GRAVE as NON-ENTRY point |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x15 | 00 | 0x0E |  |  |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x16 | 00 | 0x0A |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x17 | 00 | 0x0A |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x18 | 00 | 0x14 | TRUE |  |  |  |  |  |  |  |  | XXXXXXXXXXX |
+| 0x19 | 00 | 0x14 | TRUE |  |  |  |  |  |  |  |  | XXXXXXXXXXX |
+| 0x1A | 00 | 0x0C | TRUE |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x1B | 00 | 0x0C | TRUE |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x1C | 00 | 0x0C |  |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x1D | 00 | 0x0A |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x1E | 00 | 0x0C |  |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x1F | 00 | 0x12 |  |  |  |  |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x20 | 00 | 0x0C |  |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x22 | 00 | 0x12 |  |  |  |  |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x23 | 00 | 0x10 or 0x14 |  |  |  |  |  |  |  |  |  | XXXXXXXXXXX |
+| 0x24 | 00 | 0x0C |  |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x25 | 00 | 0x0E | TRUE |  |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x26 | 00 | 0x0A |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x27 | 00 | 0x0A |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x28 | 00 | 0x0A |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x29 | 00 | 0x0A |  | Add item to inventory |  | Item ID to add | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x2A | 00 | 0x0A |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x2B | 00 | 0x0A |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x2D | 00 | 0x0A |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x2E | 00 | 0x0A |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x2F | 00 | 0x12 |  |  |  |  |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x30 | 00 | 0x0C | TRUE |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x31 | 00 | 0x14 | TRUE |  |  |  |  |  |  |  |  | XXXXXXXXXXX |
+| 0x32 | 00 | 0x14 | TRUE |  |  |  |  |  |  |  |  | XXXXXXXXXXX |
+| 0x33 | 00 | 0x0C |  | Applies damage. | Damage amount (00=dead) | Always 0 |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x34 | 00 | 0x0C |  |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x35 | 00 | 0x0E |  |  |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x36 | 00 | 0x0A |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x37 | 00 | 0x0C | TRUE |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x38 | 00 | 0x0A |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x39 | 00 | 0x0C | TRUE |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x3A | 00 | 0x08 |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x3B | 00 | 0x12 |  | Change map (requires preceding 0x1300 command) |  |  |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x3C | 00 | 0x10 |  | Spawn entities using index id from DBASE100 (not texture relation index in ADEMO). With 0x40 enemy ID, it spawns an explosion. Also drops item on the ground if item ID specified |  |  | Entity ID |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x3D | 00 | 0x0A |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x3E | 00 | 0x06 |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x3F | 00 | 0x08 |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x40 | 00 | 0x08 |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x41 | 00 | 0x08 |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x42 | 00 | 0x08 |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+
+
+
 
 ## Section 7 (WIP)
 
