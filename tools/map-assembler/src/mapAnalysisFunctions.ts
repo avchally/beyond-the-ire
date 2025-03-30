@@ -1,4 +1,4 @@
-import { Command } from "./file_classes/CommandsSection";
+import { Command, CommandsCategoryEntry } from "./file_classes/CommandsSection";
 import MapAssembler from "./MapAssembler";
 
 export function printVerticesCounts(maps: MapAssembler[]) {
@@ -23,7 +23,7 @@ export function getVerticesCounts(maps: MapAssembler[]) {
 }
 
 export function formatAllCommandsForCSV(maps: MapAssembler[]): any[][] {
-    const commandsArray: any[][] = [['ID_NAME', 'ID_COUNT', 'MAP', 'ADJUSTED_INDEX', 'COMMAND_CHAIN_ID', 'IS_ENTRY_COMMAND', 'SIZE', 'COMMAND', 'TYPE_A', 'TYPE_B', 'NEXT_COMMAND_INDEX', 'REMAINING_ARGS', 'CALLS_THIS', 'RAW_COMMAND']];
+    const commandsArray: any[][] = [['ID_NAME', 'ID_COUNT', 'MAP', 'ADJUSTED_INDEX', 'COMMAND_CHAIN_ID', 'IS_ENTRY_COMMAND', 'SIZE', 'COMMAND', 'COMMAND_BASE', 'COMMAND_MODIFIER', 'NEXT_COMMAND_INDEX', 'REMAINING_ARGS', 'CALLS_THIS', 'RAW_COMMAND']];
     let idCount = 0;
     for (const map of maps) {
         let commandChainCount = 1;
@@ -67,4 +67,42 @@ export function formatAllCommandsForCSV(maps: MapAssembler[]): any[][] {
     }
 
     return commandsArray;
+}
+
+export function formatCommandCategoriesForCSV(maps: MapAssembler[]): any[][] {
+    const commandCategoriesArray: any[][] = [['MAP_NAME', 'ADJUSTED_INDEX', 'COMMAND_BASE', 'COMMAND_MODIFIER', 'CATEGORY_INDEX', 'RAW_COMMAND']];
+    
+    for (const map of maps) {
+        
+        // for (const mappedEntryPoint of Object.keys(map.commandsSection.commandEntryPointsRelativeOffsets)) {
+        //     console.log(Number(mappedEntryPoint).toString(16).padStart(4, '0'));
+        // }
+        
+        map.commandsSection.commandCategoriesSection.forEach((commandCat: CommandsCategoryEntry, index: number) => {
+            if (commandCat.count === 0) {
+                return;
+            }
+
+            let commandEntryIndexOffset: number = commandCat.categoryOffset;
+            // console.log(`categoryOffset: ${commandCat.categoryOffset.toString(16).padStart(4, '0')}`);
+
+            for (let i = 0; i < commandCat.count; i++) {
+                const command = map.commandsSection.commandEntryPointsRelativeOffsets[commandEntryIndexOffset];
+                if (!command) {
+                    console.log(`Could not find entry command at relative index 0x${commandEntryIndexOffset.toString(16).padStart(4, '0')} (${map.mapName})`);
+                }
+                commandCategoriesArray.push([
+                    map.mapName,
+                    command.adjustedIndexInFile,
+                    command.typeA.toString(16).padStart(2, '0'),
+                    command.typeB.toString(16).padStart(2, '0'),
+                    index,
+                    command.rawCommand
+                ]);
+                commandEntryIndexOffset += 0x02;
+            }
+        });
+    }
+
+    return commandCategoriesArray;
 }

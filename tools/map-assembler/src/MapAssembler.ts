@@ -402,7 +402,7 @@ export default class MapAssembler {
 
         for (let i = 0; i < 15; i++) {
             this.commandsSection.commandCategoriesSection[i] = {
-                category: this.fileBuffer.readUInt16LE(currentPosition),
+                categoryOffset: this.fileBuffer.readUInt16LE(currentPosition),
                 count: this.fileBuffer.readUInt16LE(currentPosition + 0x02)
             }
             currentPosition += 0x04;
@@ -472,12 +472,16 @@ export default class MapAssembler {
             currentPosition += commandSize;
         }
 
+        let entryCommandArrayPosition = 0x44;
         for (const commandOffset of this.commandsSection.commandEntryPointsOffsets) {
             if (commandOffset === 0x0000) {
+                entryCommandArrayPosition += 0x02;
                 continue;
             }
-
-            this.commandsSection.commandEntryPoints.push(this.commandsSection.relativeOffsetMap[commandOffset]);
+            const command: Command = this.commandsSection.relativeOffsetMap[commandOffset];
+            this.commandsSection.commandEntryPointsRelativeOffsets[entryCommandArrayPosition] = command;
+            this.commandsSection.commandEntryPoints.push(command);
+            entryCommandArrayPosition += 0x02;
         }
 
         for (const command of this.commandsSection.commands) {

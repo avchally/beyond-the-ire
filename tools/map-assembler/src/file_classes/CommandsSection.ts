@@ -6,7 +6,7 @@ export interface CommandsSectionHeader {
 }
 
 export interface CommandsCategoryEntry {
-    category: number; // 0x0000
+    categoryOffset: number; // 0x0000
     count: number; // 0x0000
 }
 
@@ -18,6 +18,7 @@ export default class CommandsSection {
     public commands: Command[];
     public offsetMap: { [offset: number]: Command };
     public relativeOffsetMap: { [relativeOffset: number]: Command }; // offset relative to the start of the section
+    public commandEntryPointsRelativeOffsets: { [relativeOffset: number]: Command } // offset from start of section to the entry point array element
     // public commandChains: Command[]; // just the first command since they're linked
 
     public constructor() {
@@ -27,6 +28,7 @@ export default class CommandsSection {
         // this.commandChains = [];
         this.commandEntryPointsOffsets = [];
         this.commandEntryPoints = [];
+        this.commandEntryPointsRelativeOffsets = {};
     }
 }
 

@@ -1,14 +1,15 @@
 import fs from 'fs';
 import * as path from 'path';
 import MapAssembler from './MapAssembler';
-import { formatAllCommandsForCSV, getVerticesCounts, printVerticesCounts } from './mapAnalysisFunctions';
+import { formatAllCommandsForCSV, formatCommandCategoriesForCSV, getVerticesCounts, printVerticesCounts } from './mapAnalysisFunctions';
 
 async function main() {
     const maps = await parseAllMaps();
     
     // printVerticesCounts(maps);
     // writeToCsv('./output/vertex_counts.csv', getVerticesCounts(maps));
-    writeToCsv('./output/all_commands.csv', formatAllCommandsForCSV(maps));
+    // writeToCsv('./output/all_commands.csv', formatAllCommandsForCSV(maps));
+    writeToCsv('./output/command_categories.csv', formatCommandCategoriesForCSV(maps));
 }
 
 async function parseAllMaps(): Promise<MapAssembler[]> {
@@ -30,7 +31,7 @@ async function parseAllMaps(): Promise<MapAssembler[]> {
 function writeToCsv(filePathWithName: string, arrayOfArrays: (string | number)[][]) {
     let csvString = '';
     for (const outerArray of arrayOfArrays) {
-        csvString += outerArray.join(', ') + '\n';
+        csvString += outerArray.join(',') + '\n';
     }
     console.log('Writing to CSV.');
     fs.writeFileSync(filePathWithName, csvString, 'utf8');
