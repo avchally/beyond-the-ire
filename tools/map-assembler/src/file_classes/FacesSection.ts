@@ -1,6 +1,21 @@
-import { Vertex } from "./VerticesSection";
+import VerticesSection, { Vertex } from "./VerticesSection";
 import { Sector } from "./SectorsSection";
 import { FaceTextureMapping } from "./FaceTextureMappingSection";
+import MapDisassembler, { OffsetIndexLookupMaps } from "../MapAssembler";
+
+export interface FacesSectionJSON {
+    faces: FaceJSON[];
+    // faceTextureMappingCount: number;
+}
+
+export interface FaceJSON {
+    vertexIndex01: number;
+    vertexIndex02: number;
+    textureMappingIndex: number;
+    sectorIndex: number;
+    sisterFaceIndex?: number;
+    unk0x0A: number;
+}
 
 export default class FacesSection {
     public faces: Face[];
@@ -11,6 +26,40 @@ export default class FacesSection {
         this.faces = [];
         this.offsetMap = {};
         this.faceTextureMappingCount = 0;
+    }
+
+    public static toJSON(map: MapDisassembler, offsetIndexLookupMaps: OffsetIndexLookupMaps): FacesSectionJSON {
+        const facesJSON: FaceJSON[] = [];
+        for (const face of map.facesSection.faces) {
+            
+            // console.log(`sectorOffset: ${face.sectorOffset}  | indexlookupmap: ${offsetIndexLookupMaps.sectors[face.sectorOffset]}`);
+            // console.log(JSON.stringify(offsetIndexLookupMaps.sectors, null, 2));
+
+            
+            // console.log(JSON.stringify({
+            //     vertexIndex01: offsetIndexLookupMaps.vertices[face.vertexOffset01],
+            //     vertexIndex02: offsetIndexLookupMaps.vertices[face.vertexOffset02],
+            //     textureMappingIndex: offsetIndexLookupMaps.faceTextureMappings[face.textureMappingOffset],
+            //     sectorIndex: offsetIndexLookupMaps.sectors[face.sectorOffset],
+            //     sisterFaceIndex: offsetIndexLookupMaps.faces[face.sisterFaceOffset],
+            //     unk0x0A: face.unk0x0A,
+            // }, null, 2));
+            // throw Error('test');
+            
+            facesJSON.push({
+                vertexIndex01: offsetIndexLookupMaps.vertices[face.vertexOffset01],
+                vertexIndex02: offsetIndexLookupMaps.vertices[face.vertexOffset02],
+                textureMappingIndex: offsetIndexLookupMaps.faceTextureMappings[face.textureMappingOffset],
+                sectorIndex: offsetIndexLookupMaps.sectors[face.sectorOffset],
+                sisterFaceIndex: offsetIndexLookupMaps.faces[face.sisterFaceOffset], // 0xFFFF for none, will be undefined
+                unk0x0A: face.unk0x0A,
+            })
+        }
+
+        return {
+            faces: facesJSON,
+            // faceTextureMappingCount: map.facesSection.faceTextureMappingCount,
+        }
     }
 }
 

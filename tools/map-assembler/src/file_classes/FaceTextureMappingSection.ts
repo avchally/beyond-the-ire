@@ -1,3 +1,19 @@
+import MapDisassembler from "../MapAssembler";
+
+export interface FaceTextureMappingSectionJSON {
+    mappings: FaceTextureMappingJSON[];
+}
+
+export interface FaceTextureMappingJSON {
+    unk0x00: number;
+    type: number;
+    midTextureIndex: number;
+    upperTextureIndex: number;
+    lowerTextureIndex: number;
+    unk0x08: number;
+    additionalMetadata: ExtraFaceTextureMappingData | undefined;
+}
+
 export default class FaceTextureMappingSection {
     public mappings: FaceTextureMapping[];
     public offsetMap: { [offset: number]: FaceTextureMapping };
@@ -6,13 +22,31 @@ export default class FaceTextureMappingSection {
         this.mappings = [];
         this.offsetMap = {};
     }
+
+    public static toJSON(map: MapDisassembler): FaceTextureMappingSectionJSON {
+        const mappingsJSON: FaceTextureMappingJSON[] = [];
+        for (const mapping of map.faceTextureMappingSection.mappings) {
+            mappingsJSON.push({
+                unk0x00: mapping.unk0x00,
+                type: mapping.type,
+                midTextureIndex: mapping.midTextureIndex,
+                upperTextureIndex: mapping.upperTextureIndex,
+                lowerTextureIndex: mapping.lowerTextureIndex,
+                unk0x08: mapping.unk0x08,
+                additionalMetadata: mapping.additionalMetadata || undefined,
+            });
+        }
+
+        return {
+            mappings: mappingsJSON
+        };
+    }
 }
 
-
 export interface ExtraFaceTextureMappingData {
-    shiftTextureX: number // 0x00 (signed)
-    shiftTextureY: number // 0x00 (signed)
-    unk0x0C: number // 0x0000
+    shiftTextureX: number; // 0x00 (signed)
+    shiftTextureY: number; // 0x00 (signed)
+    unk0x0C: number; // 0x0000
 }
 
 export class FaceTextureMapping {

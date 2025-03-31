@@ -1,7 +1,7 @@
 import { Command, CommandsCategoryEntry } from "./file_classes/CommandsSection";
-import MapAssembler from "./MapAssembler";
+import MapDisassembler from "./MapAssembler";
 
-export function printVerticesCounts(maps: MapAssembler[]) {
+export function printVerticesCounts(maps: MapDisassembler[]) {
     console.log('VERTICES COUNTS');
     let verticesCount = 0;
     for (const map of maps) {
@@ -11,7 +11,7 @@ export function printVerticesCounts(maps: MapAssembler[]) {
     console.log(`TOTAL COUNT: ${verticesCount}`);
 }
 
-export function getVerticesCounts(maps: MapAssembler[]) {
+export function getVerticesCounts(maps: MapDisassembler[]) {
     const vertices: (string | number)[][] = [["MAP", "COUNT"]];
     let verticesCount = 0;
     for (const map of maps) {
@@ -22,7 +22,7 @@ export function getVerticesCounts(maps: MapAssembler[]) {
     return vertices;
 }
 
-export function formatAllCommandsForCSV(maps: MapAssembler[]): any[][] {
+export function formatAllCommandsForCSV(maps: MapDisassembler[]): any[][] {
     const commandsArray: any[][] = [['ID_NAME', 'ID_COUNT', 'MAP', 'ADJUSTED_INDEX', 'COMMAND_CHAIN_ID', 'IS_ENTRY_COMMAND', 'SIZE', 'COMMAND', 'COMMAND_BASE', 'COMMAND_MODIFIER', 'NEXT_COMMAND_INDEX', 'REMAINING_ARGS', 'CALLS_THIS', 'RAW_COMMAND']];
     let idCount = 0;
     for (const map of maps) {
@@ -69,7 +69,7 @@ export function formatAllCommandsForCSV(maps: MapAssembler[]): any[][] {
     return commandsArray;
 }
 
-export function formatCommandCategoriesForCSV(maps: MapAssembler[]): any[][] {
+export function formatCommandCategoriesForCSV(maps: MapDisassembler[]): any[][] {
     const commandCategoriesArray: any[][] = [['MAP_NAME', 'ADJUSTED_INDEX', 'COMMAND_BASE', 'COMMAND_MODIFIER', 'CATEGORY_INDEX', 'RAW_COMMAND']];
     
     for (const map of maps) {

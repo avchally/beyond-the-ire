@@ -1,6 +1,6 @@
 import fs from 'fs';
 import * as path from 'path';
-import MapAssembler from './MapAssembler';
+import MapDisassembler, { RawrJson } from './MapAssembler';
 import { formatAllCommandsForCSV, formatCommandCategoriesForCSV, getVerticesCounts, printVerticesCounts } from './mapAnalysisFunctions';
 
 async function main() {
@@ -9,19 +9,27 @@ async function main() {
     // printVerticesCounts(maps);
     // writeToCsv('./output/vertex_counts.csv', getVerticesCounts(maps));
     // writeToCsv('./output/all_commands.csv', formatAllCommandsForCSV(maps));
-    writeToCsv('./output/command_categories.csv', formatCommandCategoriesForCSV(maps));
+    // writeToCsv('./output/command_categories.csv', formatCommandCategoriesForCSV(maps));
+
+    console.log(maps[0].mapName);
+    const rawrJson = MapDisassembler.exportToRAWR(maps[0]);
+    for (const map of maps) {
+        console.log(`Starting ${map.mapName}`);
+        writeToRAWRFile(MapDisassembler.exportToRAWR(map));
+    }
+    // console.log(JSON.stringify(MapDisassembler.exportToRAWR(maps[0]), null, 2));
 }
 
-async function parseAllMaps(): Promise<MapAssembler[]> {
+async function parseAllMaps(): Promise<MapDisassembler[]> {
     const mapsDirectory = 'D:\\Games\\SteamLibrary\\steamapps\\common\\Realms of the Haunting_00\\ROTH\\M';
     const mapFileNames = getMapFileNames(mapsDirectory);
 
-    const maps: MapAssembler[] = [];
+    const maps: MapDisassembler[] = [];
     for (const mapFileName of mapFileNames) {
         const mapName = mapFileName.split('.')[0];
         console.log(`Processing ${mapName}`);
         const mapFileBuffer = await fs.promises.readFile(mapsDirectory + '\\' + mapFileName);
-        maps.push(new MapAssembler(mapFileBuffer, mapName));
+        maps.push(new MapDisassembler(mapFileBuffer, mapName));
     }
 
     console.log('Finished initial map processing.\n\n');
@@ -36,6 +44,13 @@ function writeToCsv(filePathWithName: string, arrayOfArrays: (string | number)[]
     console.log('Writing to CSV.');
     fs.writeFileSync(filePathWithName, csvString, 'utf8');
     console.log(`Finished writing to CSV. ${filePathWithName}`);
+}
+
+function writeToRAWRFile(rawrJSON: RawrJson, mapName?: string) {
+    const fileNamePath = `./output/RAWR/${mapName || rawrJSON.rawrMetadata.mapName}.RAWR`;
+    console.log('Writing to RAWR file.');
+    fs.writeFileSync(fileNamePath, JSON.stringify(rawrJSON, null, 2), 'utf-8');
+    console.log(`Finished writing to RAWR file. ${fileNamePath}`);
 }
 
 function getMapFileNames(directoryPath: string): string[] {

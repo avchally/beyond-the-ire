@@ -1,8 +1,21 @@
+import MapDisassembler from "../MapAssembler";
+
 export interface VerticesHeader {
     sectionSize: number;
     sectionHeaderSize: number;
     unk0x04: number;
     verticesCount: number;
+}
+
+export interface VerticesSectionJSON {
+    // count: number;
+    vertices: VertexJSON[]
+}
+
+export interface VertexJSON {
+    // all other fields are always 0
+    x: number;
+    y: number;
 }
 
 export default class VerticesSection {
@@ -16,6 +29,13 @@ export default class VerticesSection {
         this.vertices = [];
         this.offsetMap = {};
         this.relativeOffsetMap = {};
+    }
+
+    public static toJSON(map: MapDisassembler): VerticesSectionJSON {
+        return {
+            // count: map.verticesSection.header?.verticesCount || NaN,
+            vertices: map.verticesSection.vertices.map((vertex: Vertex) => ({ x: vertex.posX, y: vertex.posY })),
+        }
     }
 }
 

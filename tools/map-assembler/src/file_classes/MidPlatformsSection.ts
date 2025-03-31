@@ -1,4 +1,20 @@
+import MapDisassembler from "../MapAssembler";
 import { Sector } from "./SectorsSection";
+
+export interface MidPlatformsSectionJSON {
+    // count: number;
+    platforms: MidPlatformJSON[];
+}
+
+export interface MidPlatformJSON {
+    ceilingTextureIndex: number;
+    ceilingHeight: number;
+    unk0x04: number;
+    floorTextureIndex: number;
+    floorHeight: number;
+    unk0x0A: number;
+    unk0x0C: number;
+}
 
 export default class MidPlatformsSection {
     public count: number;
@@ -9,6 +25,24 @@ export default class MidPlatformsSection {
         this.count = 0;
         this.platforms = [];
         this.offsetMap = {};
+    }
+
+    public static toJSON(map: MapDisassembler): MidPlatformsSectionJSON | undefined {
+        if (!map.midPlatformsSection) {
+            return undefined;
+        }
+        return {
+            // count: map.midPlatformsSection.count,
+            platforms: map.midPlatformsSection.platforms.map((midPlatform: MidPlatform) => ({
+                ceilingTextureIndex: midPlatform.ceilingTextureIndex,
+                ceilingHeight: midPlatform.ceilingHeight,
+                unk0x04: midPlatform.unk0x04,
+                floorTextureIndex: midPlatform.floorTextureIndex,
+                floorHeight: midPlatform.floorHeight,
+                unk0x0A: midPlatform.unk0x0A,
+                unk0x0C: midPlatform.unk0x0C,
+            })),
+        };
     }
 }
 

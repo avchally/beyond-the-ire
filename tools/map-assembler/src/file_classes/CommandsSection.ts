@@ -1,3 +1,5 @@
+import MapDisassembler from "../MapAssembler";
+
 export interface CommandsSectionHeader {
     signature: string;
     unk0x02: number;
@@ -8,6 +10,22 @@ export interface CommandsSectionHeader {
 export interface CommandsCategoryEntry {
     categoryOffset: number; // 0x0000
     count: number; // 0x0000
+}
+
+export interface CommandsSectionJSON {
+    header: {
+        signature: string;
+        unk0x02: number;
+    };
+    entryCommandIndexes: number[];
+    allCommands: CommandJSON[];
+}
+
+export interface CommandJSON {
+    commandBase: number; // hex
+    commandModifier: number; // hex
+    nextCommandIndex: number;
+    args: number[]; // corresponds to the commandBase
 }
 
 export default class CommandsSection {
@@ -29,6 +47,27 @@ export default class CommandsSection {
         this.commandEntryPointsOffsets = [];
         this.commandEntryPoints = [];
         this.commandEntryPointsRelativeOffsets = {};
+    }
+
+    public static toJSON(map: MapDisassembler): CommandsSectionJSON {
+        const section = map.commandsSection;
+        if (!section.header) {
+            throw new Error("No commands header found!");
+        }
+
+        return {
+            header: {
+                signature: section.header.signature,
+                unk0x02: section.header.unk0x02,
+            },
+            entryCommandIndexes: section.commandEntryPoints.map((command: Command) => command.adjustedIndexInFile || NaN),
+            allCommands: section.commands.map((command: Command) => ({
+                commandBase: command.typeA,
+                commandModifier: command.typeB,
+                nextCommandIndex: command.nextCommandIndex,
+                args: command.remainingArgs,
+            })),
+        };
     }
 }
 

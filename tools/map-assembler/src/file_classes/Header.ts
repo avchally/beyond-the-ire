@@ -1,40 +1,45 @@
+import MapDisassembler from "../MapAssembler";
+
+export interface HeaderJSON {
+    sectorCount: number;
+}
 export default class Header {
-  verticesOffset: number;
-  version: number;
-  sectorsOffset: number;
-  facesOffset: number;
-  faceTextureMapsOffset: number;
-  mapMetadataOffset: number;
-  verticesOffsetRepeat: number;
-  signature: string;
-  midPlatformsSection: number;
-  section7Size: number;
-  verticesSectionSize: number;
-  objectsSectionSize: number;
-  footerSize: number;
-  commandsSectionSize: number;
-  sectorCount: number;
+    verticesOffset: number;
+    version: number;
+    sectorsOffset: number;
+    facesOffset: number;
+    faceTextureMapsOffset: number;
+    mapMetadataOffset: number;
+    verticesOffsetRepeat: number;
+    signature: string;
+    midPlatformsSection: number;
+    section7Size: number;
+    verticesSectionSize: number;
+    objectsSectionSize: number;
+    footerSize: number;
+    commandsSectionSize: number;
+    sectorCount: number;
 
-  public constructor() {
-    this.verticesOffset = 0;
-    this.version = 0;
-    this.sectorsOffset = 0;
-    this.facesOffset = 0;
-    this.faceTextureMapsOffset = 0;
-    this.mapMetadataOffset = 0;
-    this.verticesOffsetRepeat = 0;
-    this.signature = "";
-    this.midPlatformsSection = 0;
-    this.section7Size = 0;
-    this.verticesSectionSize = 0;
-    this.objectsSectionSize = 0;
-    this.footerSize = 0;
-    this.commandsSectionSize = 0;
-    this.sectorCount = 0;
-  }
+    public constructor() {
+        this.verticesOffset = 0;
+        this.version = 0;
+        this.sectorsOffset = 0;
+        this.facesOffset = 0;
+        this.faceTextureMapsOffset = 0;
+        this.mapMetadataOffset = 0;
+        this.verticesOffsetRepeat = 0;
+        this.signature = "";
+        this.midPlatformsSection = 0;
+        this.section7Size = 0;
+        this.verticesSectionSize = 0;
+        this.objectsSectionSize = 0;
+        this.footerSize = 0;
+        this.commandsSectionSize = 0;
+        this.sectorCount = 0;
+    }
 
-  public toString(): string {
-    return `Header:
+    public toString(): string {
+        return `Header:
         VERTICES_OFFSET: 0x${this.verticesOffset.toString(16).padStart(4, '0')}
         VERSION: 0x${this.version.toString(16).padStart(4, '0')}
         SECTORS_OFFSET: 0x${this.sectorsOffset.toString(16).padStart(4, '0')}
@@ -50,5 +55,13 @@ export default class Header {
         FOOTER_SIZE: 0x${this.footerSize.toString(16).padStart(4, '0')}
         COMMANDS_SECTION_SIZE: 0x${this.commandsSectionSize.toString(16).padStart(4, '0')}
         SECTOR_COUNT: 0x${this.sectorCount.toString(16).padStart(4, '0')}`;
-  }
+    }
+
+    public static toJSON(map: MapDisassembler): HeaderJSON {
+        return {
+            sectorCount: map.header.sectorCount,
+        }
+    }
 }
+
+

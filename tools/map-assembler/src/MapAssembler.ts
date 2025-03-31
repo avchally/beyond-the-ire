@@ -1,17 +1,47 @@
-import FacesSection, { Face } from "./file_classes/FacesSection";
-import Header from "./file_classes/Header";
-import SectorsSection, { Sector } from './file_classes/SectorsSection';
-import FaceTextureMappingSection, { ExtraFaceTextureMappingData, FaceTextureMapping } from "./file_classes/FaceTextureMappingSection";
-import MidPlatformsSection, { MidPlatform } from "./file_classes/MidPlatformsSection";
-import MapMetadataSection from "./file_classes/MapMetadataSection";
-import VerticesSection, { Vertex, VerticesHeader } from "./file_classes/VerticesSection";
-import CommandsSection, { Command, CommandsCategoryEntry } from "./file_classes/CommandsSection";
-import Section7, { UnkObject01, UnkObject02 } from "./file_classes/Section7";
+import FacesSection, { Face, FacesSectionJSON } from "./file_classes/FacesSection";
+import Header, { HeaderJSON } from "./file_classes/Header";
+import SectorsSection, { Sector, SectorsSectionJSON } from './file_classes/SectorsSection';
+import FaceTextureMappingSection, { ExtraFaceTextureMappingData, FaceTextureMapping, FaceTextureMappingSectionJSON } from "./file_classes/FaceTextureMappingSection";
+import MidPlatformsSection, { MidPlatform, MidPlatformsSectionJSON } from "./file_classes/MidPlatformsSection";
+import MapMetadataSection, { MapMetadataSectionJSON } from "./file_classes/MapMetadataSection";
+import VerticesSection, { Vertex, VerticesHeader, VerticesSectionJSON } from "./file_classes/VerticesSection";
+import CommandsSection, { Command, CommandsCategoryEntry, CommandsSectionJSON } from "./file_classes/CommandsSection";
+import Section7, { Section7JSON, UnkObject01, UnkObject02 } from "./file_classes/Section7";
 import ObjectsSection, { GameObject, ObjectContainer } from "./file_classes/ObjectsSection";
 
-export default class MapAssembler {
+interface RAWRMetadata {
+    mapName: string;
+    // associatedDemo: string;
+}
+
+export interface RawrJson {
+    rawrMetadata: RAWRMetadata;
+    sectorsSection: SectorsSectionJSON;
+    facesSection: FacesSectionJSON;
+    faceTextureMappingSection: FaceTextureMappingSectionJSON;
+    midPlatformsSection?: MidPlatformsSectionJSON;
+    mapMetadataSection: MapMetadataSectionJSON;
+    verticesSection: VerticesSectionJSON;
+    commandsSection: CommandsSectionJSON;
+    section7?: Section7JSON;
+}
+
+export interface OffsetIndexLookupMap {
+    [offset: number]: number; // the value is the index in the associated array
+}
+
+export interface OffsetIndexLookupMaps {
+    sectors: OffsetIndexLookupMap;
+    faces: OffsetIndexLookupMap;
+    faceTextureMappings: OffsetIndexLookupMap;
+    midPlatforms: OffsetIndexLookupMap;
+    vertices: OffsetIndexLookupMap;
+}
+
+export default class MapDisassembler {
     public fileBuffer: Buffer<ArrayBufferLike>;
     public mapName: string;
+
     public header: Header;
     public sectorsSection: SectorsSection;
     public facesSection: FacesSection;
@@ -122,6 +152,80 @@ export default class MapAssembler {
                     face.sisterFace = face;
                 }
             }
+        }
+    }
+
+    public static exportToRAWR(map: MapDisassembler): RawrJson {
+        const offsetIndexLookupMaps = map.generateOffsetIndexLookupMaps();
+
+        return {
+            rawrMetadata: {
+                mapName: map.mapName
+            },
+            mapMetadataSection: MapMetadataSection.toJSON(map),
+            sectorsSection: SectorsSection.toJSON(map, offsetIndexLookupMaps),
+            facesSection: FacesSection.toJSON(map, offsetIndexLookupMaps),
+            faceTextureMappingSection: FaceTextureMappingSection.toJSON(map),
+            midPlatformsSection: MidPlatformsSection.toJSON(map),
+            verticesSection: VerticesSection.toJSON(map),
+            commandsSection: CommandsSection.toJSON(map),
+            section7: Section7.toJSON(map),
+        }
+    }
+
+    private generateOffsetIndexLookupMaps(): OffsetIndexLookupMaps {
+        const sectors: OffsetIndexLookupMap = {};
+        this.sectorsSection.sectors.map((sector: Sector, index: number) => {
+            if (!sector.selfOffset) {
+                console.log("No selfOffset for sector!");
+                return;
+            }
+            sectors[sector.selfOffset] = index;
+        });
+
+        const faces: OffsetIndexLookupMap = {};
+        this.facesSection.faces.map((face: Face, index: number) => {
+            if (!face.selfOffset) {
+                console.log("No selfOffset for face!");
+                return;
+            }
+            faces[face.selfOffset] = index;
+        });
+
+        const faceTextureMappings: OffsetIndexLookupMap = {};
+        this.faceTextureMappingSection.mappings.map((mapping: FaceTextureMapping, index: number) => {
+            if (!mapping.selfOffset) {
+                console.log("No selfOffset for mapping!");
+                return;
+            }
+            faceTextureMappings[mapping.selfOffset] = index;
+        });
+
+        const midPlatforms: OffsetIndexLookupMap = {};
+        this.midPlatformsSection?.platforms.map((midPlatform: MidPlatform, index: number) => {
+            if (!midPlatform.selfOffset) {
+                console.log("No selfOffset for midPlatform!");
+                return;
+            }
+            midPlatforms[midPlatform.selfOffset] = index;
+        });
+
+        // FROM SECTION START (NOT ABSOLUTE OFFSET)
+        const vertices: OffsetIndexLookupMap = {};
+        this.verticesSection.vertices.map((vertex: Vertex, index: number) => {
+            if (!vertex.selfRelativeOffset) {
+                console.log("No selfRelativeOffset for vertex!");
+                return;
+            }
+            vertices[vertex.selfRelativeOffset] = index;
+        });
+
+        return {
+            sectors,
+            faces,
+            faceTextureMappings,
+            midPlatforms,
+            vertices,
         }
     }
 
@@ -595,6 +699,7 @@ export default class MapAssembler {
             
             const objectContainer = new ObjectContainer();
             objectContainer.associatedSector = this.sectorsSection.sectors[i];
+            objectContainer.sectorIndex = i;
             this.sectorsSection.sectors[i].associatedObjectContainer = objectContainer;
             this.objectsSection.objectContainers.push(objectContainer);
 
@@ -615,7 +720,7 @@ export default class MapAssembler {
                     this.fileBuffer.readUInt8(gameObjectPosition + 0x07), // unk0x07
                     this.fileBuffer.readUInt8(gameObjectPosition + 0x08), // lighting
                     this.fileBuffer.readUInt8(gameObjectPosition + 0x09), // renderType
-                    this.fileBuffer.readUInt16LE(gameObjectPosition + 0x0A), // posZ
+                    this.fileBuffer.readInt16LE(gameObjectPosition + 0x0A), // posZ
                     this.fileBuffer.readUInt16LE(gameObjectPosition + 0x0C), // unk0x0C
                     this.fileBuffer.readUInt16LE(gameObjectPosition + 0x0E), // unk0x0E
                 );
@@ -659,3 +764,147 @@ export default class MapAssembler {
         // console.log(this.footer);
     }
 }
+
+
+/*
+
+interface RAWRJSON {
+    sectorsSection: {
+        sectors: {
+            ceilingHeight: number;
+            floorHeight: number;
+            unk0x04: number;
+            ceilingTextureIndex: number;
+            floorTextureIndex: number;
+            textureFit: number;
+            lighting: number;
+            unk0x0C: number;
+            facesCount: number;
+            firstFaceIndex: number;
+            ceilingTextureShiftX: number;
+            ceilingTextureShiftY: number;
+            floorTextureShiftX: number;
+            floorTextureShiftY: number;
+            floorTriggerID: number;
+            unk0x16: number;
+            intermediateFloorIndex: number | undefined;
+            objectInformation: {
+                posX: number;
+                posY: number;
+                textureIndex: number;
+                textureSource: number;
+                rotation: number;
+                unk0x07: number;
+                lighting: number;
+                renderType: number;
+                posZ: number;
+                unk0x0C: number;
+                unk0x0E: number;
+            }[] | undefined;
+        }[];
+    };
+    facesSection: {
+        faces: {
+            vertexIndex01: number;
+            vertexIndex02: number;
+            textureMappingIndex: number;
+            sisterFaceIndex: number;
+            unk0x0A: number;
+        }[];
+    };
+    faceTextureMappingSection: {
+        mappings: {
+            unk0x00: number;
+            type: number;
+            midTextureIndex: number;
+            upperTextureIndex: number;
+            lowerTextureIndex: number;
+            unk0x08: number;
+            additionalMetadata: {
+                shiftTextureX: number;
+                shiftTextureY: number;
+                unk0x0C: number;
+            } | undefined;
+        }[];
+    };
+    midPlatformsSection?: {
+        platforms: {
+            ceilingTextureIndex: number;
+            ceilingHeight: number;
+            unk0x04: number;
+            floorTextureIndex: number;
+            floorHeight: number;
+            unk0x0A: number;
+            unk0x0C: number;
+        }[];
+    };
+    mapMetadataSection: {
+        initPosX: number;
+        initPosZ: number;
+        initPosY: number;
+        rotation: number;
+        moveSpeed: number;
+        playerHeight: number;
+        maxClimb: number;
+        minFit: number;
+        unk0x10: number;
+        candleGlow: number;
+        lightAmbience: number;
+        unk0x16: number;
+        skyTexture: number;
+        unk0x1A: number;
+    };
+    verticesSection: {
+        vertices: {
+            // all other fields are always 0
+            x: number;
+            y: number;
+        }[]
+    };
+    commandsSection: {
+        header: {
+            signature: string;
+            unk0x02: number;
+        };
+        entryCommandIndexes: number[];
+        allCommands: {
+            commandBase: number; // hex
+            commandModifier: number; // hex
+            nextCommandIndex: number;
+            args: number[]; // corresponds to the commandBase
+        }[];
+    };
+    section7?: {
+        unkArray01: {
+            unk0x00: number;
+            unk0x02: number;
+            unk0x04: number;
+            unk0x06: number;
+            unk0x08: number;
+            unk0x0A: number;
+            unk0x0C: number;
+            unk0x0E: number;
+            unk0x10: number;
+        }[];
+        unkArray02?: {
+            unk0x00: number;
+            unk0x02: number;
+            unk0x04: number;
+            unk0x06: number;
+            unk0x08: number;
+            unk0x0A: number;
+            unk0x0C: number;
+            unk0x0E: number;
+            unk0x10: number;
+            unk0x12: number;
+            unk0x14: number;
+            unk0x16: number;
+            unk0x18: number;
+            unk0x1A: number;
+            unk0x1C: number;
+            unk0x1E: number;
+        }[];
+    };
+}
+
+*/

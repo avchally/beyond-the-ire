@@ -1,6 +1,43 @@
+import MapDisassembler from "../MapAssembler";
+
 export interface Section7Header {
     size_a: number;
     count: number;
+}
+
+export interface Section7JSON {
+    unkArray01: UnkObject01JSON[];
+    unkArray02?: UnkObject02JSON[];
+}
+
+export interface UnkObject01JSON {
+    unk0x00: number;
+    unk0x02: number;
+    unk0x04: number;
+    unk0x06: number;
+    unk0x08: number;
+    unk0x0A: number;
+    unk0x0C: number;
+    unk0x0E: number;
+    unk0x10: number;
+}
+export interface UnkObject02JSON {
+    unk0x00: number;
+    unk0x02: number;
+    unk0x04: number;
+    unk0x06: number;
+    unk0x08: number;
+    unk0x0A: number;
+    unk0x0C: number;
+    unk0x0E: number;
+    unk0x10: number;
+    unk0x12: number;
+    unk0x14: number;
+    unk0x16: number;
+    unk0x18: number;
+    unk0x1A: number;
+    unk0x1C: number;
+    unk0x1E: number;
 }
 
 export default class Section7 {
@@ -10,6 +47,40 @@ export default class Section7 {
 
     public constructor() {
         this.unkArray01 = [];
+    }
+
+    public static toJSON(map: MapDisassembler): Section7JSON {
+        return {
+            unkArray01: map.section7.unkArray01.map((unkObj01: UnkObject01) => ({
+                unk0x00: unkObj01.unk0x00,
+                unk0x02: unkObj01.unk0x02,
+                unk0x04: unkObj01.unk0x04,
+                unk0x06: unkObj01.unk0x06,
+                unk0x08: unkObj01.unk0x08,
+                unk0x0A: unkObj01.unk0x0A,
+                unk0x0C: unkObj01.unk0x0C,
+                unk0x0E: unkObj01.unk0x0E,
+                unk0x10: unkObj01.unk0x10,
+            })),
+            unkArray02: map.section7.unkArray02?.map((unkObj02: UnkObject02) => ({
+                unk0x00: unkObj02.unk0x00,
+                unk0x02: unkObj02.unk0x02,
+                unk0x04: unkObj02.unk0x04,
+                unk0x06: unkObj02.unk0x06,
+                unk0x08: unkObj02.unk0x08,
+                unk0x0A: unkObj02.unk0x0A,
+                unk0x0C: unkObj02.unk0x0C,
+                unk0x0E: unkObj02.unk0x0E,
+                unk0x10: unkObj02.unk0x10,
+                unk0x12: unkObj02.unk0x12,
+                unk0x14: unkObj02.unk0x14,
+                unk0x16: unkObj02.unk0x16,
+                unk0x18: unkObj02.unk0x18,
+                unk0x1A: unkObj02.unk0x1A,
+                unk0x1C: unkObj02.unk0x1C,
+                unk0x1E: unkObj02.unk0x1E,
+            })),
+        }
     }
 }
 

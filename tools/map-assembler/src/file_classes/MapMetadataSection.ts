@@ -1,3 +1,22 @@
+import MapDisassembler from "../MapAssembler";
+
+export interface MapMetadataSectionJSON {
+    initPosX: number;
+    initPosZ: number;
+    initPosY: number;
+    rotation: number;
+    moveSpeed: number;
+    playerHeight: number;
+    maxClimb: number;
+    minFit: number;
+    unk0x10: number;
+    candleGlow: number;
+    lightAmbience: number;
+    unk0x16: number;
+    skyTexture: number;
+    unk0x1A: number;
+}
+
 export default class MapMetadataSection {
     public constructor(
         public initPosX = 0x0000,  // signed
@@ -33,5 +52,25 @@ export default class MapMetadataSection {
             skyTexture: 0x${this.skyTexture.toString(16).padStart(4, '0')}
             unk0x1A: 0x${this.unk0x1A.toString(16).padStart(4, '0')}
         `
+    }
+
+    public static toJSON(map: MapDisassembler): MapMetadataSectionJSON {
+        const section = map.mapMetadataSection;
+        return {
+            initPosX: section.initPosX,
+            initPosZ: section.initPosZ,
+            initPosY: section.initPosY,
+            rotation: section.rotation,
+            moveSpeed: section.moveSpeed,
+            playerHeight: section.playerHeight,
+            maxClimb: section.maxClimb,
+            minFit: section.minFit,
+            unk0x10: section.unk0x10,
+            candleGlow: section.candleGlow,
+            lightAmbience: section.lightAmbience,
+            unk0x16: section.unk0x16,
+            skyTexture: section.skyTexture,
+            unk0x1A: section.unk0x1A,
+        }
     }
 }

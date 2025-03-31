@@ -1,5 +1,19 @@
 import { Sector } from "./SectorsSection";
 
+export interface ObjectJSON {
+    posX: number;
+    posY: number;
+    textureIndex: number;
+    textureSource: number;
+    rotation: number;
+    unk0x07: number;
+    lighting: number;
+    renderType: number;
+    posZ: number;
+    unk0x0C: number;
+    unk0x0E: number;
+}
+
 export default class ObjectsSection {
     public selfOffset?: number;
     public selfRelativeOffset?: number;
@@ -13,12 +27,17 @@ export default class ObjectsSection {
         this.sectorObjectMapping = [];
         this.objectContainers = [];
     }
+
+    public static toJSON() {
+
+    }
 }
 
 export class ObjectContainer {
     public selfRelativeOffset?: number;
     public selfOffset?: number;
     public associatedSector?: Sector;
+    public sectorIndex?: number;
     
     public count: number;
     public countRepeat: number;
@@ -79,4 +98,19 @@ export class GameObject {
         
     }
 
+    public toJSON(): ObjectJSON {
+        return {
+            posX: this.posX,
+            posY: this.posY,
+            textureIndex: this.textureIndex,
+            textureSource: this.textureSource,
+            rotation: this.rotation,
+            unk0x07: this.unk0x07,
+            lighting: this.lighting,
+            renderType: this.renderType,
+            posZ: this.posZ,
+            unk0x0C: this.unk0x0C,
+            unk0x0E: this.unk0x0E,
+        }
+    }
 }
