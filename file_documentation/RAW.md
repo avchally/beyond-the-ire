@@ -416,7 +416,7 @@ And here is the object itself:
 | 0x07 | 1 | UNK_0x07 | TODO Seems to be related to flags |
 | 0x08 | 1 | LIGHTING | Applies ambient lighting/shading to object. Default is 0x00 or 0x80. Lower is darker. |
 | 0x09 | 1 | RENDER_TYPE | Determines whether to apply billboarding to the texture, i.e., whether the sprite is always facing the player or not. 0x00 applies billboarding. 0x80 makes it static. TODO see what other values do |
-| 0x0A | 2 | POS_Z | Z-coordinate of the object's position (height) |
+| 0x0A | 2 (signed) | POS_Z | Z-coordinate of the object's position (height) |
 | 0x0C | 2 | UNK_0x0C | TODO |
 | 0x0E | 2 | UNK_0x0E | An ID that connects to commands. A basic interact command could have an index and it should match this. A spawn item command could use this ID to spawn the item at this object's location. Previous notes: Determines interactability and ultimately what command is run when interacted with. Influences both right and left click options. TODO it somehow runs a command from the command entry point array in the commands section, but this value is not the index in or offset to the command entry point array. |
 
