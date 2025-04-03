@@ -1,37 +1,41 @@
 # .RAW Map File
 
+The .RAW file format is used to store map data in Realms of the Haunting. The file is made up of geometry data (vertices, faces, sectors), map and game settings, object/entity placement, and commands (scripting game logic).
+
+For the first few sections in the file the count of elements in that section is found in the last 2-byte value of the previous section.
+
+Most of the time, when a texture index is specified, 0xFFXX can also be used to map a single color from the palette, where XX is the index in the palette.
+
 ## Header
 
 | Offset | Size (bytes) | Field | Description |
 | ----------- | ----------- | ----------- | ----------- |
-| 0x00  | 2 | VERTICES_OFFSET | Offset to vertices section |
-| 0x02  | 2 | VERSION | Version |
-| 0x04  | 2 | SECTORS_OFFSET | Offset to sectors section |
-| 0x06  | 2 | FACES_OFFSET | Offset to faces section |
-| 0x08  | 2 | FACE_TEXTURE_MAPS_OFFSET | Offset to the face texture mapping section |
-| 0x0A  | 2 | MAP_METADATA_OFFSET | Offset to the map metadata section |
-| 0x0C  | 2 | VERTICES_OFFSET_REPEAT | Offset to vertices section (again, not sure why) |
+| 0x00  | 2 | VERTICES_OFFSET | Offset to [vertices section](#vertices-section) |
+| 0x02  | 2 | VERSION | Version probably? |
+| 0x04  | 2 | SECTORS_OFFSET | Offset to [sectors section](#sectors-section) |
+| 0x06  | 2 | FACES_OFFSET | Offset to [faces section](#faces-section) |
+| 0x08  | 2 | FACE_TEXTURE_MAPS_OFFSET | Offset to the [face texture mapping section](#face-texture-mapping-section) |
+| 0x0A  | 2 | MAP_METADATA_OFFSET | Offset to the [map metadata section](#map-metadata-section) |
+| 0x0C  | 2 | VERTICES_OFFSET_REPEAT | Offset to [vertices section](#vertices-section) (again, not sure why) |
 | 0x0E  | 2 | SIGNATURE | Signature is ASCII chars "WR" |
-| 0x10  | 2 | MID_PLATFORMS_SECTION | Offset to intermediate platforms (if there are any, otherwise 0x00) |
+| 0x10  | 2 | MID_PLATFORMS_SECTION | Offset to [intermediate platforms](#intermediate-platforms-section-wip) (if there are any, otherwise 0x00) |
 | 0x12  | 2 | SECTION_7_SIZE | Section 7 size TODO unknown section |
-| 0x14  | 2 | VERTICES_SECTION_SIZE | Size of the vertices section |
-| 0x16  | 2 | OBJECTS_SECTION_SIZE | Size of the objects section |
-| 0x18  | 2 | FOOTER_SIZE | Footer size |
-| 0x1A  | 2 | COMMANDS_SECTION_SIZE | Size of the commands section |
-| 0x1C  | 2 | SECTOR_COUNT | Number of objects in the sector section |
+| 0x14  | 2 | VERTICES_SECTION_SIZE | Size of the [vertices section](#vertices-section) |
+| 0x16  | 2 | OBJECTS_SECTION_SIZE | Size of the [objects section](#objects-section) |
+| 0x18  | 2 | FOOTER_SIZE | [Footer](#footer) size |
+| 0x1A  | 2 | COMMANDS_SECTION_SIZE | Size of the [commands section](#commands-section-wip) |
+| 0x1C  | 2 | SECTOR_COUNT | Number of objects in the [sectors section](#sectors-section) |
 
 The file size can be calculated with:  
 `FILE_SIZE = VERTICES_OFFSET + VERTICES_SECTION_SIZE + COMMANDS_SECTION_SIZE + SECTION_7_SIZE + OBJECTS_SECTION_SIZE + FOOTER_SIZE`;
-
-**Quick note on textures**
-
-Most of the time, when a texture index is specified, 0xFFXX can also be used to map a single color from the palette, where XX is the index in the palette.
 
 ## Sectors Section
 
 **Starts at `HEADER.SECTORS_OFFSET`**
 
 This section contains sector data. A sector is a collection of faces that form a closed 2D shape. A sector contains data such as floor height, ceiling height, texture mapping, and lighting. The very end of the section is a 2 byte value that represents the total number of faces in the file.
+
+Since ROTH uses binary space partitioning (like DOOM), sectors must be convex, otherwise they will not render properly.
 
 The section is laid out like this:
 
@@ -53,14 +57,14 @@ The sector object:
 | 0x0B  | 1 | LIGHTING | Sets lighting in the sector (from a distance?) |
 | 0x0C  | 1 | UNK_0C | TODO (have only seen 0) |
 | 0x0D  | 1 | FACES_COUNT | Number of faces that make up this segment |
-| 0x0E  | 2 | FIRST_FACE_OFFSET | Offset to the first face of this segment (the engine then uses this + FACES_COUNT to gather all faces) |
+| 0x0E  | 2 | FIRST_FACE_OFFSET | Offset to the first [face](#faces-section) of this segment (the engine then uses this + FACES_COUNT to gather all faces) |
 | 0x10  | 1 (signed) | CEIL_TEXTURE_SHIFT_X | Shifts the ceiling texture along the x-axis |
 | 0x11  | 1 (signed) | CEIL_TEXTURE_SHIFT_Y | Shifts the ceiling texture along the y-axis |
 | 0x12  | 1 (signed) | FLOOR_TEXTURE_SHIFT_X | Shifts the floor texture along the x-axis |
 | 0x13  | 1 (signed) | FLOOR_TEXTURE_SHIFT_Y | Shifts the floor texture along the y-axis |
 | 0x14  | 2 | FLOOR_TRIGGER_ID | The ID of an established floor trigger command. When the player walks over the sector, this floor trigger command is executed. |
 | 0x16  | 2 | UNK_0x16 | TODO (have only seen 0) |
-| 0x18  | 2 | INT_FLOOR_OFFSET | Offset to an intermediate platform that should be added to this sector |
+| 0x18  | 2 | INT_FLOOR_OFFSET | Offset to an [intermediate platform](#intermediate-platforms-section-wip) that should be added to this sector |
 
 ## Faces Section
 
@@ -79,10 +83,10 @@ The face object:
 
 | Offset | Size (bytes) | Field | Description |
 | ----------- | ----------- | ----------- | ----------- |
-| 0x00  | 2 | VERTEX_01_OFFSET | First vertex's offset from the start of the vertices section |
-| 0x02  | 2 | VERTEX_02_OFFSET | Second vertex's offset from the start of the vertices section |
-| 0x04  | 2 | TEXTURE_MAP_OFFSET | Offset to the texture mapping definition (in face texture mapping section) |
-| 0x06  | 2 | SECTOR_OFFSET | Offset to the associated sector |
+| 0x00  | 2 | VERTEX_01_OFFSET | First [vertex](#vertices-section)'s offset from the start of the vertices section |
+| 0x02  | 2 | VERTEX_02_OFFSET | Second [vertex](#vertices-section)'s offset from the start of the vertices section |
+| 0x04  | 2 | TEXTURE_MAP_OFFSET | Offset to the [texture mapping definition](#face-texture-mapping-section) |
+| 0x06  | 2 | SECTOR_OFFSET | Offset to the associated [sector](#sectors-section) |
 | 0x08  | 2 | SISTER_FACE_OFFSET | Offset to a sister face, making this two-sided. When one-sided, this value is 0xFFFF. |
 | 0x0A  | 2 | UNK_0x0A | TODO |
 
@@ -123,7 +127,7 @@ This is an optional section and contains data about intermediate (or middle) pla
 
 Unlike the DOOM engine, ROTH can create additional platforms within a sector. An intermediate platform contains a ceiling and a floor, where the ceiling is the underside of the platform and the floor is the topside.
 
-If `HEADER.MID_PLATFORMS_SECTION` is 0x00, this section is not present. It's also important to note that, like the other first few sections, the count is contained in the 2 bytes preceding the offset in the header.
+If `HEADER.MID_PLATFORMS_SECTION` is 0x00, this section is not present. It's also important to note that, like the other first few sections, the count is contained in the 2 bytes preceding the offset in the header. When this section is not present, the count (at -0x02) is also not present, which is why I  included it in this section and not at the end of the previous section.
 
 The section is laid out as follows:
 
@@ -207,7 +211,7 @@ Each command can optionally choose to call another command, resulting in a comma
 
 The commands section contains a simple header, a table of entry command counts, an array of entry command references, and an array of all commands. See the breakdown of the commands section below.
 
-The table of entry command counts declares how many entry commands of each category there are in the map. The section always contains 15 4 byte entries. Each entry corresponds to a given type of entry command. For example, the first entry will ALWAYS correspond to entry commands where `COMMAND_BASE == 0x08 or 0x02`. The first two bytes of the entry is a relative offset from section start to the first command in the array of entry command references. The last two bytes of the entry is a count of how many commands of that type there are. See the Entry Command Counts section below for more information.
+The table of entry command counts declares how many entry commands of each category there are in the map. The section always contains 15 4 byte entries. Each entry corresponds to a given type of entry command. For example, the first entry will ALWAYS correspond to entry commands where `COMMAND_BASE == 0x08 or 0x02`. The first two bytes of the entry is a relative offset from section start to the first command in the array of entry command references. The last two bytes of the entry is a count of how many commands of that type there are. See the [Entry Command Counts](#entry-command-counts-categories) section below for more information.
 
 The array of entry command references is an array of 2 byte elements. Each element is a relative offset from section start to the associated command in the array of all commands. 
 
@@ -332,7 +336,7 @@ Each command can also have a COMMAND_MODIFIER. Most of the time this is 0x00, bu
 | 0x39 | 00 | 0x0C | TRUE |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
 | 0x3A | 00 | 0x08 |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
 | 0x3B | 00 | 0x12 |  | Change map (requires preceding 0x1300 command) |  |  |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX |
-| 0x3C | 00 | 0x10 |  | Spawn entities using index id from DBASE100 (not texture relation index in ADEMO). With 0x40 enemy ID, it spawns an explosion. Also drops item on the ground if item ID specified |  |  | Entity ID |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x3C | 00 | 0x10 |  | Spawn entities using index id from DBASE100 (not texture relation index in ADEMO). |  |  | Entity ID |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
 | 0x3D | 00 | 0x0A |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
 | 0x3E | 00 | 0x06 |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
 | 0x3F | 00 | 0x08 |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
@@ -347,7 +351,7 @@ Each command can also have a COMMAND_MODIFIER. Most of the time this is 0x00, bu
 
 **Starts at `HEADER.VERTICES_OFFSET + HEADER.VERTICES_SECTION_SIZE + HEADER.COMMANDS_SECTION_SIZE`**
 
-Little is known about this section, but it tends to be pretty small. In my testing, modifying this resulted in no apparent changes. Will need to do more testing.
+Little is known about this section, but it tends to be pretty small. In my testing, modifying this resulted in no apparent changes. Even completely zeroing out the section showed no signs of altered gameplay. Will need to do more testing.
 
 There could be an additional optional section that contains 0x20-sized elements. The size of this sub-section is NOT included in the size of the overall section's header. It IS, however, included in the section size of the file's header.
 
@@ -356,7 +360,7 @@ The section is as follows:
 | Offset | Size (bytes) | Field | Description |
 | ----------- | ----------- | ----------- | ----------- |
 | 0x00  | 2 | SIZE_A | Size in bytes of the section's first sub-section |
-| 0x02  | 2 | COUNT | Count of elements in section's array |
+| 0x02  | 2 | COUNT | Count of elements in section's first array |
 | 0x04  | 0x12 * COUNT | UNKNOWN_ARRAY_01 | Array of section elements TODO |
 | SIZE_A | HEADER.SECTION_7_SIZE - SIZE_A | UNKNOWN_ARRAY_02 | Optionally, there may be an additional ending sub-section of 0x20-sized elements |
 
@@ -418,9 +422,11 @@ And here is the object itself:
 | 0x09 | 1 | RENDER_TYPE | Determines whether to apply billboarding to the texture, i.e., whether the sprite is always facing the player or not. 0x00 applies billboarding. 0x80 makes it static. TODO see what other values do |
 | 0x0A | 2 (signed) | POS_Z | Z-coordinate of the object's position (height) |
 | 0x0C | 2 | UNK_0x0C | TODO |
-| 0x0E | 2 | UNK_0x0E | An ID that connects to commands. A basic interact command could have an index and it should match this. A spawn item command could use this ID to spawn the item at this object's location. Previous notes: Determines interactability and ultimately what command is run when interacted with. Influences both right and left click options. TODO it somehow runs a command from the command entry point array in the commands section, but this value is not the index in or offset to the command entry point array. |
+| 0x0E | 2 | UNK_0x0E | An ID that connects to commands. A basic interact command could have an index and it should match this. A spawn entity command could use this ID to spawn the entity at this object's location. |
 
 ## Footer
+
+Unsure of the purpose it serves.
 
 Seems to pretty consistently be the following value:
 
