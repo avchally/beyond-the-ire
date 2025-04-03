@@ -3,16 +3,38 @@ import * as path from 'path';
 import { RAWRJSON } from "./rawrjson";
 
 function main() {
-    const mapName = 'ABAGATE3'
-    const rawrPath = `./test/RAWR_input/${mapName}.RAWR`;
-    const outputPath = `./test/RAW_output/${mapName}.RAW`;
-    const rawrJson: RAWRJSON = JSON.parse(fs.readFileSync(rawrPath, 'utf-8'));
-    console.log(`Processing ${mapName}`);
-    const rawBuffer = createRawFileBuffer(rawrJson);
-    fs.writeFileSync(outputPath, rawBuffer);
-    console.log(`Wrote to ${outputPath}`)
+    const rawrDirectory = `../../output/RAWR/`;
+    const outputDirectory = `../../output/RAW_reprocessed/`;
+
+    const mapNames: string[] = getRAWRMapFileNames(rawrDirectory);
+
+    console.log(mapNames);
+    for (const mapName of mapNames) {
+        const rawrJson: RAWRJSON = JSON.parse(fs.readFileSync(path.join(rawrDirectory, `${mapName}.RAWR`), 'utf-8'));
+        console.log(`Processing ${mapName}`);
+        const rawBuffer = createRawFileBuffer(rawrJson);
+        writeRawBufferToFile(outputDirectory, rawBuffer, mapName);
+    }
 }
 main();
+
+function writeRawBufferToFile(outputDir: string, rawBuffer: Buffer, mapName: string) {
+    console.log(`Writing map ${mapName} to .RAW file.`);
+    fs.mkdirSync(outputDir, { recursive: true });
+    const filePath = path.join(outputDir, `${mapName}.RAW`);
+    fs.writeFileSync(filePath, rawBuffer);
+}
+
+function getRAWRMapFileNames(directoryPath: string): string[] {
+    try {
+      const files = fs.readdirSync(directoryPath);
+      const mapFiles = files.filter(file => path.extname(file).toLowerCase() === '.rawr').map(file => file.toLowerCase().split('.rawr')[0]);
+      return mapFiles;
+    } catch (error) {
+      console.error('Error reading directory:', error);
+      return [];
+    }
+  };
 
 /////////////////////////////////////////////////////////////////////
 
@@ -165,8 +187,8 @@ function writeTextureMappingSection(buffer: Buffer, rawr: RAWRJSON, sectionSizes
         buffer.writeUInt16LE(mapping.unk0x08, position + 0x08);
         position += 0x0A;
         if (mapping.additionalMetadata && Object.keys(mapping.additionalMetadata).length > 0) {
-            buffer.writeUInt8(mapping.additionalMetadata.shiftTextureX, position);
-            buffer.writeUInt8(mapping.additionalMetadata.shiftTextureY, position + 0x01);
+            buffer.writeInt8(mapping.additionalMetadata.shiftTextureX, position);
+            buffer.writeInt8(mapping.additionalMetadata.shiftTextureY, position + 0x01);
             buffer.writeUInt16LE(mapping.additionalMetadata.unk0x0C, position + 0x02);
             position += 0x04;
         }
@@ -442,7 +464,7 @@ function calculateSectionSizesAndOffsets(rawr: RAWRJSON): SectionSizes {
     };
 
     const midPlatformSection: SectionSizeData = {
-        startsAt: rawr.midPlatformsSection ? textureMappingSection.startsAt + facesSection.size + 0x02 : 0x00,
+        startsAt: rawr.midPlatformsSection ? textureMappingSection.startsAt + textureMappingSection.size + 0x02 : 0x00,
         size: rawr.midPlatformsSection ? rawr.midPlatformsSection.platforms.length * 0x0E : 0x00,
     };
 

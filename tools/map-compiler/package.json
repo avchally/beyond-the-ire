@@ -1,5 +1,5 @@
 {
-  "name": "map-assembler",
+  "name": "map-compiler",
   "version": "1.0.0",
   "description": "",
   "main": "dist/index.js",
