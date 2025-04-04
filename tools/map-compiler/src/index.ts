@@ -125,7 +125,7 @@ function writeSectors(buffer: Buffer, rawr: RAWRJSON, sectionSizes: SectionSizes
     let position = sectionStart;
     for (const sector of rawr.sectorsSection.sectors) {
         const firstFaceOffset = sectionSizes.facesSection.startsAt + sector.firstFaceIndex * 0x0C;
-        const midPlatformOffset = sectionSizes.midPlatformSection.size > 0x00 && sector.intermediateFloorIndex 
+        const midPlatformOffset = sectionSizes.midPlatformSection.size > 0x00 && sector.intermediateFloorIndex !== undefined 
             ? sectionSizes.midPlatformSection.startsAt + sector.intermediateFloorIndex * 0x0E
             : 0x00;
         
@@ -212,6 +212,7 @@ function writeMidPlatformSection(buffer: Buffer, rawr: RAWRJSON, sectionSizes: S
         buffer.writeInt16LE(midPlatform.floorHeight, position + 0x08);
         buffer.writeUInt16LE(midPlatform.unk0x0A, position + 0x0A);
         buffer.writeUInt16LE(midPlatform.unk0x0C, position + 0x0C);
+        position += 0x0E;
     }
 }
 
