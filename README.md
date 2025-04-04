@@ -1,2 +1,2 @@
-# beyond-the-ire
-Beyond the Ire: a ROTH decomp project (Realms of the Haunting)
+# Beyond the Ire
+The goal of this project is to understand the core file formats used in Realms of the Haunting. 
