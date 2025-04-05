@@ -17,7 +17,7 @@ export interface SectorJSON {
     floorTextureIndex: number;
     textureFit: number;
     lighting: number;
-    unk0x0C: number;
+    textureMapOverride: number;
     facesCount: number;
     firstFaceIndex: number;
     ceilingTextureShiftX: number;
@@ -54,7 +54,7 @@ export default class SectorsSection {
                 floorTextureIndex: sector.floorTextureIndex,
                 textureFit: sector.textureFit,
                 lighting: sector.lighting,
-                unk0x0C: sector.unk0x0C,
+                textureMapOverride: sector.textureMapOverride,
                 facesCount: sector.facesCount,
                 firstFaceIndex: offsetIndexLookupMaps.faces[sector.firstFaceOffset],
                 ceilingTextureShiftX: sector.ceilingTextureShiftX,
@@ -98,7 +98,7 @@ export class Sector {
         public floorTextureIndex = 0x0000,
         public textureFit = 0x00,
         public lighting = 0x00,
-        public unk0x0C = 0x00,
+        public textureMapOverride = 0x00,      // signed
         public facesCount = 0x00,
         public firstFaceOffset = 0x0000,
         public ceilingTextureShiftX = 0x00, // signed
@@ -123,7 +123,7 @@ export class Sector {
             floorTextureIndex: 0x${this.floorTextureIndex.toString(16).padStart(4, '0')}
             textureFit: ${this.textureFit}
             lighting: ${this.lighting}
-            unk0x0C: ${this.unk0x0C.toString(16).padStart(4, '0')}
+            textureMapOverride: ${this.textureMapOverride.toString(16).padStart(4, '0')}
             facesCount: ${this.facesCount}
             firstFaceOffset: 0x${this.firstFaceOffset.toString(16).padStart(4, '0')}
             ceilingTextureShiftX: ${this.ceilingTextureShiftX}

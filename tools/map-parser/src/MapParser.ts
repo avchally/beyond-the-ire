@@ -75,26 +75,6 @@ export default class MapParser {
         // this.commandAnalysis();
     }
 
-
-    private commandAnalysis() {
-        console.log(`public command chains:\n`);
-        for (let entryCommand of this.commandsSection.commandEntryPoints) {
-            let currentCommand: Command | undefined = entryCommand;
-            let fallbackCount = 0;
-            while (currentCommand) {
-                console.log(currentCommand.rawCommand);
-                currentCommand = currentCommand.nextCommand;
-                fallbackCount++;
-                if (fallbackCount > 10000) {
-                    console.log('INFINITE LOOP');
-                    break;
-                }
-            }
-            console.log();
-            // console.log('---------------------------------------------');
-        }
-    }
-
     private applyRemainingRelations() {
         for (const sector of this.sectorsSection.sectors) {
             if (sector.intermediateFloorOffset > 0x0000) {
@@ -294,7 +274,7 @@ export default class MapParser {
                 this.fileBuffer.readUInt16LE(currentPosition + 0x08),  // floorTextureIndex
                 this.fileBuffer.readUInt8(currentPosition + 0x0A),  // textureFit
                 this.fileBuffer.readUInt8(currentPosition + 0x0B),  // lighting
-                this.fileBuffer.readUInt8(currentPosition + 0x0C),  // unk0x0C
+                this.fileBuffer.readInt8(currentPosition + 0x0C),  // textureMapOverride
                 this.fileBuffer.readUInt8(currentPosition + 0x0D),  // facesCount
                 this.fileBuffer.readUInt16LE(currentPosition + 0x0E),  // firstFaceOffset
                 this.fileBuffer.readInt8(currentPosition + 0x10),  // ceilingTextureShiftX
@@ -333,7 +313,7 @@ export default class MapParser {
                 this.fileBuffer.readUInt16LE(currentPosition + 0x04), // textureMappingOffset
                 this.fileBuffer.readUInt16LE(currentPosition + 0x06), // sectorOffset
                 this.fileBuffer.readUInt16LE(currentPosition + 0x08), // sisterFaceOffset
-                this.fileBuffer.readUInt16LE(currentPosition + 0x0A), // unk0x0A
+                this.fileBuffer.readUInt16LE(currentPosition + 0x0A), // addCollision
             );
 
             face.selfOffset = currentPosition;

@@ -14,7 +14,7 @@ export interface FaceJSON {
     textureMappingIndex: number;
     sectorIndex: number;
     sisterFaceIndex?: number;
-    unk0x0A: number;
+    addCollision: number;
 }
 
 export default class FacesSection {
@@ -52,7 +52,7 @@ export default class FacesSection {
                 textureMappingIndex: offsetIndexLookupMaps.faceTextureMappings[face.textureMappingOffset],
                 sectorIndex: offsetIndexLookupMaps.sectors[face.sectorOffset],
                 sisterFaceIndex: offsetIndexLookupMaps.faces[face.sisterFaceOffset], // 0xFFFF for none, will be undefined
-                unk0x0A: face.unk0x0A,
+                addCollision: face.addCollision,
             })
         }
 
@@ -78,7 +78,7 @@ export class Face {
         public textureMappingOffset = 0x0000,
         public sectorOffset = 0x0000,
         public sisterFaceOffset = 0x0000,
-        public unk0x0A = 0x0000,
+        public addCollision = 0x0000,
     ) {}
 
     public toString(): string {
@@ -91,7 +91,7 @@ export class Face {
             textureMappingOffset: 0x${this.textureMappingOffset.toString(16).padStart(4, '0')}
             sectorOffset: 0x${this.sectorOffset.toString(16).padStart(4, '0')}
             sisterFaceOffset: 0x${this.sisterFaceOffset.toString(16).padStart(4, '0')}
-            unk0x0A: ${this.unk0x0A}
+            addCollision: ${this.addCollision}
         `
     }
 }

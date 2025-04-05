@@ -1,7 +1,8 @@
 import fs from 'fs';
 import * as path from 'path';
 import MapParser, { RawrJson } from './MapParser';
-import { formatAllCommandsForCSV, formatCommandCategoriesForCSV, getVerticesCounts, printVerticesCounts } from './mapAnalysisFunctions';
+import { formatAllCommandsForCSV, formatCommandCategoriesForCSV, getAllUnk0x0AFromFaces, getVerticesCounts, printAllUnk0x0CFromObjects, printAllUnkFromSectors, printVerticesCounts } from './utils/mapAnalysisFunctions';
+import { mirrorMapY, setMapMetadata, stripUnkFields } from './utils/mapModifierFunctions';
 
 async function main() {
     
@@ -14,10 +15,23 @@ async function main() {
     // writeToCsv('./output/all_commands.csv', formatAllCommandsForCSV(maps));
     // writeToCsv('./output/command_categories.csv', formatCommandCategoriesForCSV(maps));
 
+    // const unk0x0AFaces = getAllUnk0x0AFromFaces(maps);
+    // console.log(JSON.stringify(unk0x0AFaces, null, 2));
+    // console.log(`unk0x0A\tunk0x0A(hex)\tcount`);
+    // for (const [unk, count] of Object.entries(unk0x0AFaces)) {
+    //     console.log(`${unk}\t${Number(unk).toString(16).padStart(4, '0')}\t${count}`);
+    // }
+
+    // printAllUnk0x0CFromObjects(maps);
+    // printAllUnkFromSectors(maps);
 
     for (const map of maps) {
         console.log(`Starting ${map.mapName}`);
-        writeToRAWRFile(outputDirectory, MapParser.exportToRAWR(map));
+        const rawr = MapParser.exportToRAWR(map);
+        setMapMetadata(rawr);
+        // stripUnkFields(rawr);
+        mirrorMapY(rawr);
+        writeToRAWRFile(outputDirectory, rawr);
     }
 }
 

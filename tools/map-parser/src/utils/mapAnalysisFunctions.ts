@@ -1,5 +1,7 @@
-import { Command, CommandsCategoryEntry } from "./file_classes/CommandsSection";
-import MapParser from "./MapParser";
+import { Command, CommandsCategoryEntry } from "../file_classes/CommandsSection";
+import MapParser, { RawrJson } from "../MapParser";
+
+
 
 export function printVerticesCounts(maps: MapParser[]) {
     console.log('VERTICES COUNTS');
@@ -20,6 +22,80 @@ export function getVerticesCounts(maps: MapParser[]) {
     }
     vertices.push(['TOTAL COUNT', verticesCount]);
     return vertices;
+}
+
+// export function getUnk0x0AFromFaces(rawr: RawrJson): { [value: number]: number } {
+//     const unk0x0AMap: { [value: number]: number } = {};
+//     for (const face of rawr.facesSection.faces) {
+//         if (!unk0x0AMap[face.unk0x0A]) {
+//             unk0x0AMap[face.unk0x0A] = 0;
+//         }
+//         unk0x0AMap[face.unk0x0A]++;
+//     }
+
+//     return unk0x0AMap;
+// }
+
+export function printAllUnkFromSectors(maps: MapParser[]): { [value: number]: number } {
+    const unk0x0CMap: { [value: number]: number } = {};
+    for (const map of maps) {
+        for (const sector of map.sectorsSection.sectors) {
+            if (!unk0x0CMap[sector.textureMapOverride]) {
+                unk0x0CMap[sector.textureMapOverride] = 0;
+            }
+            unk0x0CMap[sector.textureMapOverride]++;
+        }
+    }
+
+    console.log(JSON.stringify(unk0x0CMap, null, 2));
+    console.log(`unk0x0C\tunk0x0C(hex)\tcount`);
+    for (const [unk, count] of Object.entries(unk0x0CMap)) {
+        console.log(`${unk}\t${Number(unk).toString(16).padStart(4, '0')}\t${count}`);
+    }
+
+    return unk0x0CMap;
+}
+
+export function printAllUnk0x0CFromObjects(maps: MapParser[]): { [value: number]: number } {
+    const unk0x0CMap: { [value: number]: number } = {};
+    for (const map of maps) {
+        for (const objectContainer of map.objectsSection.objectContainers) {
+            for (const object of objectContainer.objects) {
+                if (!unk0x0CMap[object.unk0x0C]) {
+                    unk0x0CMap[object.unk0x0C] = 0;
+                }
+                unk0x0CMap[object.unk0x0C]++;
+            }
+        }
+    }
+
+    console.log(JSON.stringify(unk0x0CMap, null, 2));
+    console.log(`unk0x0C\tunk0x0C(hex)\tcount`);
+    for (const [unk, count] of Object.entries(unk0x0CMap)) {
+        if (count > 100) {
+            console.log(`${unk}\t${Number(unk).toString(16).padStart(4, '0')}\t${count}`);
+        }
+    }
+
+    return unk0x0CMap;
+}
+
+export function getAllUnk0x0AFromFaces(maps: MapParser[]): { [value: number]: number } {
+    const unk0x0AMap: { [value: number]: number } = {};
+    for (const map of maps) {
+        for (const face of map.facesSection.faces) {
+            if (face.addCollision > 0 && face.sisterFaceOffset === 0xFFFF) {
+                console.log(`${map.mapName}: ${face.selfOffset?.toString(16).padStart(4, '0')} ${face.addCollision.toString(16).padStart(4, '0')}`);
+            }
+            // for (const face of rawr.facesSection.faces) {
+            if (!unk0x0AMap[face.addCollision]) {
+                unk0x0AMap[face.addCollision] = 0;
+            }
+            unk0x0AMap[face.addCollision]++;
+        }
+    }
+
+    return unk0x0AMap;
 }
 
 export function formatAllCommandsForCSV(maps: MapParser[]): any[][] {
