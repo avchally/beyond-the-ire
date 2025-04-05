@@ -55,7 +55,7 @@ The sector object:
 | 0x08  | 2 | FLOOR_TEXTURE_INDEX | Index of the *.DAS texture for the ceiling |
 | 0x0A  | 1 | TEXTURE_FIT | scaling/fitting texture to area |
 | 0x0B  | 1 | LIGHTING | Sets lighting in the sector (from a distance?) |
-| 0x0C  | 1 | UNK_0C | TODO (have only seen 0) |
+| 0x0C  | 1 (signed) | TEXTURE_MAP_OVERRIDE | Overrides the default position and size of the MID_TEXTURE in the [face texture mapping](#face-texture-mapping-section) for each face in the sector. The value is the size. Zero is default (fit to size). Negative values anchor the texture to the floor, positive values anchor the texture to the ceiling. |
 | 0x0D  | 1 | FACES_COUNT | Number of faces that make up this segment |
 | 0x0E  | 2 | FIRST_FACE_OFFSET | Offset to the first [face](#faces-section) of this segment (the engine then uses this + FACES_COUNT to gather all faces) |
 | 0x10  | 1 (signed) | CEIL_TEXTURE_SHIFT_X | Shifts the ceiling texture along the x-axis |
@@ -71,6 +71,8 @@ The sector object:
 **Starts at `HEADER.FACES_OFFSET`**
 
 This section contains face data. A face is a line between two vertices that can have texture mapping applied to it. A set of faces connect to make a sector. A face can be one-sided or two-sided. A face is considered two-sided if it has an associated "sister face", which is a face that is part of a different sector, but shares the same two vertices, making the two faces essentially overlap.
+
+When a face is one-sided, it will automatically have collision applied to it.
 
 The section is laid out similar to the sectors section:
 
@@ -88,7 +90,25 @@ The face object:
 | 0x04  | 2 | TEXTURE_MAP_OFFSET | Offset to the [texture mapping definition](#face-texture-mapping-section) |
 | 0x06  | 2 | SECTOR_OFFSET | Offset to the associated [sector](#sectors-section) |
 | 0x08  | 2 | SISTER_FACE_OFFSET | Offset to a sister face, making this two-sided. When one-sided, this value is 0xFFFF. |
-| 0x0A  | 2 | UNK_0x0A | TODO |
+| 0x0A  | 2 | ADD_COLLISION | This field adds collision to two-sided faces (and probably more). |
+
+#### ADD_COLLISION
+
+The ADD_COLLISION field applies (additional?) collision information to the face. Since two-sided faces are inherently collision-free, this field can add collision to it. If two-way collision is desired, it must be applied on both side faces.
+
+The most common values for ADD_COLLISION are below:
+
+| Value | Description |
+| ----------- | ----------- |
+| 0x00  | No collision at all |
+| 0x01  | Has collision for player, enemies, and projectiles |
+| 0x02  | Has collision for enemies, but not for player and projectiles |
+| 0x03  | Has collision for player and enemies, but not for projectiles |
+
+Some less common values include: `0x80, 0x81, 0x83, 0x89, 0x08, 0x09, 0x0A, 0x0B`.  
+These values may provide additional characteristics that are not yet clear.
+
+There are many one-sided faces that use this field, but it's currently not clear what purpose that serves.
 
 ## Face Texture Mapping Section
 
@@ -115,7 +135,7 @@ See the object data below:
 | 0x08  | 2 | UNK_0x08 | TODO: not fully figured out. 0xAE fits to size |
 | 0x0A? | 1 \| 0 (signed) | SHIFT_TEXTURE_X | Shifts the texture along the x-axis (optional, see TYPE field) |
 | 0x0B? | 1 \| 0 (signed) | SHIFT_TEXTURE_Y | Shifts the texture along the y-axis (optional, see TYPE field) |
-| 0x0C? | 2 \| 0 | UNK_0x0C | TODO |
+| 0x0C? | 2 \| 0 | UNK_0x0C | WIP Notes: affects interactions with doors and other types of faces. Since one face texture mapping can be applied to any number of faces, maybe this allows assigning some generic command chain. |
 
 **On texture shifting:** if a texture is shifted even a pixel too far (where empty texture would be rendered), the whole face will have messed up rendering
 
