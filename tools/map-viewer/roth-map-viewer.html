@@ -1225,7 +1225,11 @@
             }
             
             // Draw each face
+            let i = 0;
             for (const face of faces) {
+                face.index = i;
+                i++;
+                
                 // Skip if we don't have vertex data
                 if (!face.vertex1 || !face.vertex2) continue;
                 
@@ -1439,6 +1443,7 @@
                 if (hoveredFace) {
                     let info = `<strong>Face Info:</strong><br>`;
                     info += `Offset: 0x${hoveredFace.selfOffset?.toString(16).padStart(4, '0')}<br>`;
+                    info += `Index: ${hoveredFace.index}<br>`;
                     info += `Vertex1 Offset: 0x${hoveredFace.vertexOffset01?.toString(16).padStart(4, '0')}<br>`;
                     info += `Vertex2 Offset: 0x${hoveredFace.vertexOffset02?.toString(16).padStart(4, '0')}<br>`;
                     info += `Sister Face: ${hoveredFace.sisterFaceOffset !== 0xFFFF ? '0x' + hoveredFace.sisterFaceOffset?.toString(16).padStart(4, '0') : 'None'}<br>`;
