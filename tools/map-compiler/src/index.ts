@@ -10,10 +10,14 @@ function main() {
 
     console.log(mapNames);
     for (const mapName of mapNames) {
-        const rawrJson: RAWRJSON = JSON.parse(fs.readFileSync(path.join(rawrDirectory, `${mapName}.RAWR`), 'utf-8'));
-        console.log(`Processing ${mapName}`);
-        const rawBuffer = createRawFileBuffer(rawrJson);
-        writeRawBufferToFile(outputDirectory, rawBuffer, mapName);
+        try {
+            const rawrJson: RAWRJSON = JSON.parse(fs.readFileSync(path.join(rawrDirectory, `${mapName}.RAWR`), 'utf-8'));
+            console.log(`Processing ${mapName}`);
+            const rawBuffer = createRawFileBuffer(rawrJson);
+            writeRawBufferToFile(outputDirectory, rawBuffer, mapName);
+        } catch (error) {
+            console.log(`Map failed: ${mapName}. ${error}`);
+        }
     }
 }
 main();
@@ -136,7 +140,7 @@ function writeSectors(buffer: Buffer, rawr: RAWRJSON, sectionSizes: SectionSizes
         buffer.writeUInt16LE(sector.floorTextureIndex, position + 0x08);
         buffer.writeUInt8(sector.textureFit, position + 0x0A);
         buffer.writeUInt8(sector.lighting, position + 0x0B);
-        buffer.writeUInt8(sector.unk0x0C, position + 0x0C);
+        buffer.writeInt8(sector.textureMapOverride, position + 0x0C);
         buffer.writeUInt8(sector.facesCount, position + 0x0D);
         buffer.writeUInt16LE(firstFaceOffset, position + 0x0E);
         buffer.writeInt8(sector.ceilingTextureShiftX, position + 0x10);
@@ -167,7 +171,7 @@ function writeFaces(buffer: Buffer, rawr: RAWRJSON, sectionSizes: SectionSizes, 
         buffer.writeUInt16LE(textureMappingOffset, position + 0x04);
         buffer.writeUInt16LE(sectorOffset, position + 0x06);
         buffer.writeUInt16LE(sisterFaceOffset, position + 0x08);
-        buffer.writeUInt16LE(face.unk0x0A, position + 0x0A);
+        buffer.writeUInt16LE(face.addCollision, position + 0x0A);
         position += 0x0C;
     }
     buffer.writeUInt16LE(rawr.faceTextureMappingSection.mappings.length, position);

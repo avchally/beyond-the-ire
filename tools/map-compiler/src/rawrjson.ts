@@ -8,7 +8,7 @@ export interface RAWRJSON {
             floorTextureIndex: number;
             textureFit: number;
             lighting: number;
-            unk0x0C: number;
+            textureMapOverride: number;
             facesCount: number;
             firstFaceIndex: number;
             ceilingTextureShiftX: number;
@@ -40,7 +40,7 @@ export interface RAWRJSON {
             textureMappingIndex: number;
             sectorIndex: number;
             sisterFaceIndex?: number;
-            unk0x0A: number;
+            addCollision: number;
         }[];
     };
     faceTextureMappingSection: {
