@@ -386,11 +386,14 @@ export default class MapParser {
             const midPlatform = new MidPlatform(
                 this.fileBuffer.readUInt16LE(currentPosition),        // ceilingTextureIndex
                 this.fileBuffer.readInt16LE(currentPosition + 0x02), // ceilingHeight
-                this.fileBuffer.readUInt16LE(currentPosition + 0x04), // unk0x04
+                this.fileBuffer.readInt8(currentPosition + 0x04), // ceilingTextureShiftX
+                this.fileBuffer.readInt8(currentPosition + 0x05), // ceilingTextureShiftY
                 this.fileBuffer.readUInt16LE(currentPosition + 0x06), // floorTextureIndex
                 this.fileBuffer.readInt16LE(currentPosition + 0x08), // floorHeight
-                this.fileBuffer.readUInt16LE(currentPosition + 0x0A), // unk0x0A
-                this.fileBuffer.readUInt16LE(currentPosition + 0x0C), // unk0x0C
+                this.fileBuffer.readInt8(currentPosition + 0x0A), // floorTextureShiftX
+                this.fileBuffer.readInt8(currentPosition + 0x0B), // floorTextureShiftY
+                this.fileBuffer.readUInt8(currentPosition + 0x0C), // floorTextureScale
+                this.fileBuffer.readUInt8(currentPosition + 0x0D), // padding
             );
 
             midPlatform.selfOffset = currentPosition;

@@ -62,6 +62,11 @@ export function mirrorMapY(rawr: RawrJson) {
             // }
         }
     }
+
+    // if (rawr.midPlatformsSection?.platforms) {
+    //         for (const midPlatform of rawr.midPlatformsSection.platforms) {
+    //         }
+    // }
 }
 
 // export function scaleMap(rawr: RawrJson) {
@@ -105,13 +110,13 @@ export function stripUnkFields(rawr: RawrJson) {
     }
 
 
-    if (rawr.midPlatformsSection) {
-        for (const midPlatform of rawr.midPlatformsSection.platforms) {
-            midPlatform.unk0x04 = 0;
-            midPlatform.unk0x0A = 0;
-            midPlatform.unk0x0C = 0;
-        }
-    }
+    // if (rawr.midPlatformsSection) {
+    //     for (const midPlatform of rawr.midPlatformsSection.platforms) {
+    //         midPlatform.unk0x04 = 0;
+    //         midPlatform.unk0x0A = 0;
+    //         midPlatform.unk0x0C = 0;
+    //     }
+    // }
 
     // skipping map metadata (not relevant) and vertices (all unk are already 0)
     

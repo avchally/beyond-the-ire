@@ -30,7 +30,7 @@ async function main() {
         const rawr = MapParser.exportToRAWR(map);
         setMapMetadata(rawr);
         // stripUnkFields(rawr);
-        mirrorMapY(rawr);
+        // mirrorMapY(rawr);
         writeToRAWRFile(outputDirectory, rawr);
     }
 }

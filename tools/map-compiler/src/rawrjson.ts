@@ -62,11 +62,14 @@ export interface RAWRJSON {
         platforms: {
             ceilingTextureIndex: number;
             ceilingHeight: number;
-            unk0x04: number;
+            ceilingTextureShiftX: number;
+            ceilingTextureShiftY: number;
             floorTextureIndex: number;
             floorHeight: number;
-            unk0x0A: number;
-            unk0x0C: number;
+            floorTextureShiftX: number;
+            floorTextureShiftY: number;
+            floorTextureScale: number;
+            padding?: number;
         }[];
     };
     mapMetadataSection: {

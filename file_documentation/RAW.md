@@ -162,11 +162,14 @@ The intermediate platform object:
 | ----------- | ----------- | ----------- | ----------- |
 | 0x00  | 2 | CEIL_TEXTURE_INDEX | Texture index for the ceiling (underside) |
 | 0x02  | 2 (signed) | CEIL_HEIGHT | Z-coordinate of the ceiling (underside) |
-| 0x04  | 2 | UNK_0x04 | TODO |
+| 0x04  | 1 (signed) | CEIL_TEXTURE_SHIFT_X | Shifts the ceiling (underside) texture along the x-axis |
+| 0x05  | 1 (signed) | CEIL_TEXTURE_SHIFT_Y | Shifts the ceiling (underside) texture along the y-axis |
 | 0x06  | 2 | FLOOR_TEXTURE_INDEX | Texture index for the floor (topside) |
 | 0x08  | 2 (signed) | FLOOR_HEIGHT | Z-coordinate of the floor (topside) |
-| 0x0A  | 2 | UNK_0x0A | TODO |
-| 0x0C  | 2 | UNK_0x0C | TODO |
+| 0x0A  | 1 (signed) | FLOOR_TEXTURE_SHIFT_X | Shifts the floor (topside) texture along the x-axis |
+| 0x0B  | 1 (signed) | FLOOR_TEXTURE_SHIFT_Y | Shifts the floor (topside) texture along the y-axis |
+| 0x0C  | 1 | FLOOR_TEXTURE_SCALE | Modifies the scale of the floor (topside) texture. |
+| 0x0D  | 1 | PADDING | This value is always 0. Modifying it changes nothing. |
 
 ## Map Metadata Section
 

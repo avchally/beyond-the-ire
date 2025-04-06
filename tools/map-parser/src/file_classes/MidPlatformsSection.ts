@@ -9,11 +9,14 @@ export interface MidPlatformsSectionJSON {
 export interface MidPlatformJSON {
     ceilingTextureIndex: number;
     ceilingHeight: number;
-    unk0x04: number;
+    ceilingTextureShiftX: number;
+    ceilingTextureShiftY: number;
     floorTextureIndex: number;
     floorHeight: number;
-    unk0x0A: number;
-    unk0x0C: number;
+    floorTextureShiftX: number;
+    floorTextureShiftY: number;
+    floorTextureScale: number;
+    padding?: number;
 }
 
 export default class MidPlatformsSection {
@@ -36,11 +39,14 @@ export default class MidPlatformsSection {
             platforms: map.midPlatformsSection.platforms.map((midPlatform: MidPlatform) => ({
                 ceilingTextureIndex: midPlatform.ceilingTextureIndex,
                 ceilingHeight: midPlatform.ceilingHeight,
-                unk0x04: midPlatform.unk0x04,
+                ceilingTextureShiftX: midPlatform.ceilingTextureShiftX,
+                ceilingTextureShiftY: midPlatform.ceilingTextureShiftY,
                 floorTextureIndex: midPlatform.floorTextureIndex,
                 floorHeight: midPlatform.floorHeight,
-                unk0x0A: midPlatform.unk0x0A,
-                unk0x0C: midPlatform.unk0x0C,
+                floorTextureShiftX: midPlatform.floorTextureShiftX,
+                floorTextureShiftY: midPlatform.floorTextureShiftY,
+                floorTextureScale: midPlatform.floorTextureScale,
+                padding: midPlatform.padding,
             })),
         };
     }
@@ -53,11 +59,14 @@ export class MidPlatform {
     public constructor(
         public ceilingTextureIndex = 0x0000,
         public ceilingHeight = 0x0000, // signed
-        public unk0x04 = 0x0000,
+        public ceilingTextureShiftX = 0x00, // signed
+        public ceilingTextureShiftY = 0x00, // signed
         public floorTextureIndex = 0x0000,
         public floorHeight = 0x0000, //signed
-        public unk0x0A = 0x0000,
-        public unk0x0C = 0x0000,
+        public floorTextureShiftX = 0x00, // signed
+        public floorTextureShiftY = 0x00, // signed
+        public floorTextureScale = 0x00,
+        public padding = 0x00,
     ) {
         this.associatedSectors = [];
     }
@@ -69,11 +78,14 @@ export class MidPlatform {
             fields
             ceilingTextureIndex: 0x${this.ceilingTextureIndex.toString(16).padStart(4, '0')}
             ceilingHeight: ${this.ceilingHeight}
-            unk0x04: 0x${this.unk0x04.toString(16).padStart(4, '0')}
+            ceilingTextureShiftX: ${this.ceilingTextureShiftX}
+            ceilingTextureShiftY: ${this.ceilingTextureShiftY}
             floorTextureIndex: 0x${this.floorTextureIndex.toString(16).padStart(4, '0')}
             floorHeight: ${this.floorHeight}
-            unk0x0A: 0x${this.unk0x0A.toString(16).padStart(4, '0')}
-            unk0x0C: 0x${this.unk0x0C.toString(16).padStart(4, '0')}
+            floorTextureShiftX: ${this.floorTextureShiftX}
+            floorTextureShiftY: ${this.floorTextureShiftY}
+            floorTextureScale: ${this.floorTextureScale.toString(16).padStart(2, '0')}
+            padding: ${this.padding.toString(16).padStart(2, '0')}
         `
     }
 }

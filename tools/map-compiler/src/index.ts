@@ -211,11 +211,14 @@ function writeMidPlatformSection(buffer: Buffer, rawr: RAWRJSON, sectionSizes: S
     for (const midPlatform of rawr.midPlatformsSection.platforms) {
         buffer.writeUInt16LE(midPlatform.ceilingTextureIndex, position);
         buffer.writeInt16LE(midPlatform.ceilingHeight, position + 0x02);
-        buffer.writeUInt16LE(midPlatform.unk0x04, position + 0x04);
+        buffer.writeInt8(midPlatform.ceilingTextureShiftX, position + 0x04);
+        buffer.writeInt8(midPlatform.ceilingTextureShiftY, position + 0x05);
         buffer.writeUInt16LE(midPlatform.floorTextureIndex, position + 0x06);
         buffer.writeInt16LE(midPlatform.floorHeight, position + 0x08);
-        buffer.writeUInt16LE(midPlatform.unk0x0A, position + 0x0A);
-        buffer.writeUInt16LE(midPlatform.unk0x0C, position + 0x0C);
+        buffer.writeInt8(midPlatform.floorTextureShiftX, position + 0x0A);
+        buffer.writeInt8(midPlatform.floorTextureShiftY, position + 0x0B);
+        buffer.writeUInt8(midPlatform.floorTextureScale, position + 0x0C);
+        buffer.writeUInt8(midPlatform.padding || 0, position + 0x0D);
         position += 0x0E;
     }
 }
