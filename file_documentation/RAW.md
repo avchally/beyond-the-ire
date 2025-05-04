@@ -53,17 +53,17 @@ The sector object:
 | 0x04  | 2 | UNK_0x04 | TODO |
 | 0x06  | 2 | CEIL_TEXTURE_INDEX | Index of the *.DAS texture for the ceiling |
 | 0x08  | 2 | FLOOR_TEXTURE_INDEX | Index of the *.DAS texture for the ceiling |
-| 0x0A  | 1 | TEXTURE_FIT | scaling/fitting texture to area |
+| 0x0A  | 1 | SECTOR_FLAGS | Bit flags that represent the following:<br>LINK_EXISTS: Used in the demo editor to represent a map transition. The game now uses the command interface, but a few left over instances of this flag can be found.<br>CANDLE: Sector is lit by the lantern.<br>CEIL_A: The next two bits represent the scaling of the texture on the ceiling. If a,b is (0,0): 1/2 scale. (1,0): full scale. (0,1): 2x scale. (1,1): 4x scale.<br>CEIL_B<br>FLOOR_A: Same as above but for the floor.<br>FLOOR_B<br>LIGHTNING: Sector will have lightning flashes.<br>FLAG_8: Unused
 | 0x0B  | 1 | LIGHTING | Sets lighting in the sector (from a distance?) |
-| 0x0C  | 1 (signed) | TEXTURE_MAP_OVERRIDE | Overrides the default position and size of the MID_TEXTURE in the [face texture mapping](#face-texture-mapping-section) for each face in the sector. The value is the size. Zero is default (fit to size). Negative values anchor the texture to the floor, positive values anchor the texture to the ceiling. |
+| 0x0C  | 1 (signed) | TEXTURE_MAP_OVERRIDE | Overrides the default position and size of the MID_TEXTURE in the [face texture mapping](#face-texture-mapping-section) for double-sided faces in the sector with the TRANSPARENT and TRANSPARENT_FIXED_SIZE flags set. The value is the size. Zero is default (fit to size). Negative values anchor the texture to the floor, positive values anchor the texture to the ceiling. |
 | 0x0D  | 1 | FACES_COUNT | Number of faces that make up this segment |
 | 0x0E  | 2 | FIRST_FACE_OFFSET | Offset to the first [face](#faces-section) of this segment (the engine then uses this + FACES_COUNT to gather all faces) |
-| 0x10  | 1 (signed) | CEIL_TEXTURE_SHIFT_X | Shifts the ceiling texture along the x-axis |
-| 0x11  | 1 (signed) | CEIL_TEXTURE_SHIFT_Y | Shifts the ceiling texture along the y-axis |
-| 0x12  | 1 (signed) | FLOOR_TEXTURE_SHIFT_X | Shifts the floor texture along the x-axis |
-| 0x13  | 1 (signed) | FLOOR_TEXTURE_SHIFT_Y | Shifts the floor texture along the y-axis |
+| 0x10  | 1 | CEIL_TEXTURE_SHIFT_X | Shifts the ceiling texture along the x-axis |
+| 0x11  | 1 | CEIL_TEXTURE_SHIFT_Y | Shifts the ceiling texture along the y-axis |
+| 0x12  | 1 | FLOOR_TEXTURE_SHIFT_X | Shifts the floor texture along the x-axis |
+| 0x13  | 1 | FLOOR_TEXTURE_SHIFT_Y | Shifts the floor texture along the y-axis |
 | 0x14  | 2 | FLOOR_TRIGGER_ID | The ID of an established floor trigger command. When the player walks over the sector, this floor trigger command is executed. |
-| 0x16  | 2 | UNK_0x16 | TODO (have only seen 0) |
+| 0x16  | 2 | TEXTURE_FLIP_FLAGS | Across all maps the first 8 bits are unused. The next 4 bits are:<br>FLOOR_FLIP_X, FLOOR_FLIP_Y, CEIL_FLIP_X, CEIL_FLIP_Y<br> The last 4 bits are unused. |
 | 0x18  | 2 | INT_FLOOR_OFFSET | Offset to an [intermediate platform](#intermediate-platforms-section-wip) that should be added to this sector |
 
 ## Faces Section
@@ -127,17 +127,19 @@ See the object data below:
 
 | Offset | Size (bytes) | Field | Description |
 | ----------- | ----------- | ----------- | ----------- |
-| 0x00  | 1 | UNK_0x00 | TODO |
-| 0x01  | 1 | TYPE | When this value >= 0x80, additional scaling/shifting metadata is included. With 0x8X, X also specifies how many times to repeat the texture while fitting to face |
+| 0x00  | 2 | HORIZONTAL_FIT | When the top bit of this value is set then additional data is included (SHIFT_TEXTURE_X, SHIFT_TEXTURE_Y, UNK_0x0C)<br><br>The remaining 15 bits are read as a single value and represent how many pixels of the texture to draw on the face. It seems to always be set to the length of the face. |
 | 0x02  | 2 | MID_TEXTURE_INDEX | Primary face texture. The index of the *.DAS texture |
 | 0x04  | 2 | UPPER_TEXTURE_INDEX | Texture for the upper portion (ie, when the ceiling on an adjacent sector is lower) |
 | 0x06  | 2 | LOWER_TEXTURE_INDEX | Texture for the lower portion (ie, when the floor on an adjacent sector is higher) |
-| 0x08  | 2 | UNK_0x08 | TODO: not fully figured out. 0xAE fits to size |
-| 0x0A? | 1 \| 0 (signed) | SHIFT_TEXTURE_X | Shifts the texture along the x-axis (optional, see TYPE field) |
-| 0x0B? | 1 \| 0 (signed) | SHIFT_TEXTURE_Y | Shifts the texture along the y-axis (optional, see TYPE field) |
+| 0x08  | 2 | TEXTURE_FLAGS | Bit flags for the texture:<br>TRANSPARENT: Shows the midTexture when set on a double-sided face.<br>FLIP_X: Flips the texture horizontally.<br>IMAGE_FIT: Fits the image to the face. If TRANSPARENT is set, only applies to the midTexture.<br>TRANSPARENT_FIXED_SIZE: When this flag is set along with TRANSPARENT, it will render the midTexture at a fixed size according to the sectors textureMapOverride value. A positive value pins to the ceiling and a negative value pins to the floor.<br>NO_REFLECT: Unclear. The name comes from the demo editor.<br>HALF_PIXEL: Halves the size of the texture<br>EDGE_MAP: The skybox will be rendered above the top of the face.<br>DRAW_FROM_BOTTOM: Draws the texture from the bottom of the face instead of the top.<br>The next 8 bits are all unused.
+| 0x0A? | 1 \| 0 | SHIFT_TEXTURE_X | Shifts the texture along the x-axis (optional, see HORIZONTAL_FIT field) |
+| 0x0B? | 1 \| 0 | SHIFT_TEXTURE_Y | Shifts the texture along the y-axis (optional, see HORIZONTAL_FIT field) |
 | 0x0C? | 2 \| 0 | UNK_0x0C | WIP Notes: affects interactions with doors and other types of faces. Since one face texture mapping can be applied to any number of faces, maybe this allows assigning some generic command chain. |
 
-**On texture shifting:** if a texture is shifted even a pixel too far (where empty texture would be rendered), the whole face will have messed up rendering
+**Notes about textures:**
+- Textures whose width are a power of two can tile horizontally correctly.
+- Textures whose height are a power of two can tile vertically correctly.
+- Textures that aren't a power of two and don't fit to the whole face either because they're not long enough, shifted past the end, or have too high a HORIZONTAL_FIT value, will render completely messed up.
 
 ## Intermediate Platforms Section (WIP)
 
@@ -162,12 +164,12 @@ The intermediate platform object:
 | ----------- | ----------- | ----------- | ----------- |
 | 0x00  | 2 | CEIL_TEXTURE_INDEX | Texture index for the ceiling (underside) |
 | 0x02  | 2 (signed) | CEIL_HEIGHT | Z-coordinate of the ceiling (underside) |
-| 0x04  | 1 (signed) | CEIL_TEXTURE_SHIFT_X | Shifts the ceiling (underside) texture along the x-axis |
-| 0x05  | 1 (signed) | CEIL_TEXTURE_SHIFT_Y | Shifts the ceiling (underside) texture along the y-axis |
+| 0x04  | 1 | CEIL_TEXTURE_SHIFT_X | Shifts the ceiling (underside) texture along the x-axis |
+| 0x05  | 1 | CEIL_TEXTURE_SHIFT_Y | Shifts the ceiling (underside) texture along the y-axis |
 | 0x06  | 2 | FLOOR_TEXTURE_INDEX | Texture index for the floor (topside) |
 | 0x08  | 2 (signed) | FLOOR_HEIGHT | Z-coordinate of the floor (topside) |
-| 0x0A  | 1 (signed) | FLOOR_TEXTURE_SHIFT_X | Shifts the floor (topside) texture along the x-axis |
-| 0x0B  | 1 (signed) | FLOOR_TEXTURE_SHIFT_Y | Shifts the floor (topside) texture along the y-axis |
+| 0x0A  | 1 | FLOOR_TEXTURE_SHIFT_X | Shifts the floor (topside) texture along the x-axis |
+| 0x0B  | 1 | FLOOR_TEXTURE_SHIFT_Y | Shifts the floor (topside) texture along the y-axis |
 | 0x0C  | 1 | FLOOR_TEXTURE_SCALE | Modifies the scale of the floor (topside) texture. |
 | 0x0D  | 1 | PADDING | This value is always 0. Modifying it changes nothing. |
 
