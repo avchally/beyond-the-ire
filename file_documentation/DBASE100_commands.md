@@ -16,7 +16,7 @@
 | 14   | 1           | Displays Texture                  | DBase300 Offset / 8
 | 17   | 52          | Give item                         | Item index
 | 25   | 7           | Play SFX                          | Index from FXSCRIPT.SFX
-| 26   | 23          | ?                                 | ?Looks like an offset
+| 26   | 23          | Change Music                      | DBase400 Offset / 8
 | 28   | 2           | ?                                 | Always 16777215 (0xFFFFFF)
 | 29   | 127         | Jump to different command         | DBASE100 command index
 | 35   | 5           | Map Command Index Callback        | Map Command Index
