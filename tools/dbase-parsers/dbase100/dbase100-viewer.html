@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DBASE100 Analyzer</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #222; color: #eee; }
+        .container { display: flex; flex-direction: column; max-width: 95vw; margin: 0 auto; min-height: 95vh; }
+        h1 { text-align: center; color: #f8bb3d; }
+        .panel { background: #333; border-radius: 6px; padding: 16px; margin-bottom: 16px; }
+        .row { display: flex; gap: 16px; }
+        .col { flex: 1; }
+        .drop-zone { border: 2px dashed #555; border-radius: 5px; padding: 18px; text-align: center; background: #2a2a2a; cursor: pointer; }
+        .drop-zone.dragover { border-color: #f8bb3d; background: #333; }
+        .status { font-family: monospace; background: #444; padding: 10px; border-radius: 4px; max-height: 120px; overflow: auto; white-space: pre-line; }
+        table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        th, td { padding: 6px 8px; border-bottom: 1px solid #444; }
+        th { background: #3a3a3a; position: sticky; top: 0; }
+        .pill { display: inline-block; padding: 2px 6px; border-radius: 10px; background: #555; font-size: 12px; }
+        input, select, button, textarea { background: #444; color: #fff; border: 1px solid #666; border-radius: 4px; padding: 6px 8px; box-sizing: border-box; max-width: 100%; }
+        input[data-label] { width: 100%; }
+        button { cursor: pointer; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .list { max-height: 70vh; overflow-y: auto; overflow-x: hidden; }
+        .flex { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .small { font-size: 12px; color: #ccc; }
+        .muted { color: #aaa; }
+        .nowrap { white-space: nowrap; }
+        .progress { background: #444; border-radius: 4px; height: 8px; width: 220px; overflow: hidden; display: inline-block; vertical-align: middle; margin-left: 8px; }
+        .progress-inner { background: #4caf50; height: 100%; width: 0%; }
+    </style>
+    <!-- Kaitai runtime and generated parser -->
+    <script src="https://unpkg.com/kaitai-struct/KaitaiStream.js"></script>
+    <script>
+    // Lightweight UMD loader shim: expose Dbase100File from embedded generated code below
+    </script>
+    <script>
+    // Begin embedded Dbase100File (copied from tools/dbase-parsers/kaitai/Dbase100File.js UMD global path)
+    // Minimal adaptation: assume KaitaiStream is already global
+    // eslint-disable-next-line
+    (function (root, factory) { root.Dbase100File = factory(root.KaitaiStream); }(typeof self !== 'undefined' ? self : this, function (KaitaiStream) {
+      var Dbase100File = (function() {
+        function Dbase100File(_io, _parent, _root) { this._io = _io; this._parent = _parent; this._root = _root || this; this._read(); }
+        Dbase100File.prototype._read = function() {
+          this.dbase100 = KaitaiStream.bytesToStr(this._io.readBytes(8), "ASCII");
+          this.fileSize = this._io.readU4le(); this.unk0x0c = this._io.readU4le();
+          this.inventoryCount = this._io.readU4le(); this.inventorySectionOffset = this._io.readU4le();
+          this.actionsCount = this._io.readU4le(); this.actionsSectionOffset = this._io.readU4le();
+          this.cutscenesCount = this._io.readU4le(); this.cutscenesSectionOffset = this._io.readU4le();
+          this.interfacesCount = this._io.readU4le(); this.interfacesSectionOffset = this._io.readU4le();
+          this.unk0x30 = this._io.readU4le(); }
+        var InventoryLookupEntry = Dbase100File.InventoryLookupEntry = (function() { function InventoryLookupEntry(_io, _parent, _root) { this._io=_io; this._parent=_parent; this._root=_root||this; this._read(); }
+          InventoryLookupEntry.prototype._read=function(){ this.inventoryEntryOffset=this._io.readU4le(); }
+          Object.defineProperty(InventoryLookupEntry.prototype,'object',{ get:function(){ if (this._m_object!==undefined) return this._m_object; if (this.inventoryEntryOffset != 0){ var _pos=this._io.pos; this._io.seek(this.inventoryEntryOffset); this._m_object=new InventoryObject(this._io,this,this._root); this._io.seek(_pos);} return this._m_object; }});
+          return InventoryLookupEntry; })();
+        var InterfaceLookupEntry = Dbase100File.InterfaceLookupEntry = (function(){ function InterfaceLookupEntry(_io,_parent,_root){ this._io=_io; this._parent=_parent; this._root=_root||this; this._read(); }
+          InterfaceLookupEntry.prototype._read=function(){ this.interfaceOffset=this._io.readU4le(); }; return InterfaceLookupEntry; })();
+        var InventoryObject = Dbase100File.InventoryObject = (function(){ function InventoryObject(_io,_parent,_root){ this._io=_io; this._parent=_parent; this._root=_root||this; this._read(); }
+          InventoryObject.prototype._read=function(){ this.length=this._io.readU2le(); this.unk0x02=this._io.readU2le(); this.closeupType=this._io.readU1(); this.itemType=this._io.readU1(); this.unk0x06=this._io.readU1(); this.unk0x07=this._io.readU1(); this.closeupImageOffset=this._io.readU4le(); this.inventoryImageOffset=this._io.readU4le(); this.nameOffset=this._io.readU4le(); this.additionalLength=this._io.readU2le(); this.unk0x16=this._io.readU1(); this.unk0x17=this._io.readU1(); this.inventoryActions=[]; for (var i=0;i<Math.floor((this.length-24)/4);i++){ this.inventoryActions.push(new Action(this._io,this,this._root)); } };
+          return InventoryObject; })();
+        var CutsceneSection = Dbase100File.CutsceneSection = (function(){ function CutsceneSection(_io,_parent,_root){ this._io=_io; this._parent=_parent; this._root=_root||this; this._read(); }
+          CutsceneSection.prototype._read=function(){ this.entries=[]; for (var i=0;i<this._root.cutscenesCount;i++){ this.entries.push(new CutsceneEntry(this._io,this,this._root)); } }; return CutsceneSection; })();
+        var CutsceneEntry = Dbase100File.CutsceneEntry = (function(){ function CutsceneEntry(_io,_parent,_root){ this._io=_io; this._parent=_parent; this._root=_root||this; this._read(); }
+          CutsceneEntry.prototype._read=function(){ this.entry=this._io.readBytes(20); }; return CutsceneEntry; })();
+        var ActionLookupEntry = Dbase100File.ActionLookupEntry = (function(){ function ActionLookupEntry(_io,_parent,_root){ this._io=_io; this._parent=_parent; this._root=_root||this; this._read(); }
+          ActionLookupEntry.prototype._read=function(){ this.actionOffset=this._io.readU4le(); };
+          Object.defineProperty(ActionLookupEntry.prototype,'actionChain',{ get:function(){ if (this._m_actionChain!==undefined) return this._m_actionChain; var _pos=this._io.pos; this._io.seek(this.actionOffset); this._m_actionChain=new ActionChain(this._io,this,this._root); this._io.seek(_pos); return this._m_actionChain; }});
+          return ActionLookupEntry; })();
+        var InventoryLookupSection = Dbase100File.InventoryLookupSection = (function(){ function InventoryLookupSection(_io,_parent,_root){ this._io=_io; this._parent=_parent; this._root=_root||this; this._read(); }
+          InventoryLookupSection.prototype._read=function(){ this.entries=[]; for (var i=0;i<this._root.inventoryCount;i++){ this.entries.push(new InventoryLookupEntry(this._io,this,this._root)); } }; return InventoryLookupSection; })();
+        var ActionChain = Dbase100File.ActionChain = (function(){ function ActionChain(_io,_parent,_root){ this._io=_io; this._parent=_parent; this._root=_root||this; this._read(); }
+          ActionChain.prototype._read=function(){ this.entryAction=new Action(this._io,this,this._root); if (this.entryAction.command==3){ this.actions=[]; for (var i=0;i<this.numRemaining;i++){ this.actions.push(new Action(this._io,this,this._root)); } } };
+          Object.defineProperty(ActionChain.prototype,'numRemaining',{ get:function(){ if (this._m_numRemaining!==undefined) return this._m_numRemaining; this._m_numRemaining=(this.entryAction.command==3 ? (this.entryAction.args>0 ? (Math.floor(this.entryAction.args/4)-1) : 0) : 0); return this._m_numRemaining; }});
+          return ActionChain; })();
+        var InterfacesLookupSection = Dbase100File.InterfacesLookupSection = (function(){ function InterfacesLookupSection(_io,_parent,_root){ this._io=_io; this._parent=_parent; this._root=_root||this; this._read(); }
+          InterfacesLookupSection.prototype._read=function(){ this.entries=[]; for (var i=0;i<this._root.interfacesCount;i++){ this.entries.push(new InterfaceLookupEntry(this._io,this,this._root)); } }; return InterfacesLookupSection; })();
+        var Action = Dbase100File.Action = (function(){ function Action(_io,_parent,_root){ this._io=_io; this._parent=_parent; this._root=_root||this; this._read(); }
+          Action.prototype._read=function(){ this.argsBytes=this._io.readBytes(3); this.command=this._io.readU1(); };
+          Object.defineProperty(Action.prototype,'args',{ get:function(){ if (this._m_args!==undefined) return this._m_args; this._m_args=((this.argsBytes[0]+(this.argsBytes[1]<<8))+(this.argsBytes[2]<<16)); return this._m_args; }});
+          return Action; })();
+        var ActionsLookupSection = Dbase100File.ActionsLookupSection = (function(){ function ActionsLookupSection(_io,_parent,_root){ this._io=_io; this._parent=_parent; this._root=_root||this; this._read(); }
+          ActionsLookupSection.prototype._read=function(){ this.entries=[]; for (var i=0;i<this._root.actionsCount;i++){ this.entries.push(new ActionLookupEntry(this._io,this,this._root)); } }; return ActionsLookupSection; })();
+        Object.defineProperty(Dbase100File.prototype,'cutsceneSection',{ get:function(){ if (this._m_cutsceneSection!==undefined) return this._m_cutsceneSection; var _pos=this._io.pos; this._io.seek(this.cutscenesSectionOffset); this._m_cutsceneSection=new CutsceneSection(this._io,this,this._root); this._io.seek(_pos); return this._m_cutsceneSection; }});
+        Object.defineProperty(Dbase100File.prototype,'interfacesLookupSection',{ get:function(){ if (this._m_interfacesLookupSection!==undefined) return this._m_interfacesLookupSection; var _pos=this._io.pos; this._io.seek(this.interfacesSectionOffset); this._m_interfacesLookupSection=new InterfacesLookupSection(this._io,this,this._root); this._io.seek(_pos); return this._m_interfacesLookupSection; }});
+        Object.defineProperty(Dbase100File.prototype,'inventoryLookupSection',{ get:function(){ if (this._m_inventoryLookupSection!==undefined) return this._m_inventoryLookupSection; var _pos=this._io.pos; this._io.seek(this.inventorySectionOffset); this._m_inventoryLookupSection=new InventoryLookupSection(this._io,this,this._root); this._io.seek(_pos); return this._m_inventoryLookupSection; }});
+        Object.defineProperty(Dbase100File.prototype,'actionsLookupSection',{ get:function(){ if (this._m_actionsLookupSection!==undefined) return this._m_actionsLookupSection; var _pos=this._io.pos; this._io.seek(this.actionsSectionOffset); this._m_actionsLookupSection=new ActionsLookupSection(this._io,this,this._root); this._io.seek(_pos); return this._m_actionsLookupSection; }});
+        return Dbase100File; })(); return Dbase100File; }));
+    // End embedded Dbase100File
+    </script>
+</head>
+<body>
+    <div class="container">
+        <h1>DBASE100 Analyzer</h1>
+
+        <div class="panel">
+            <div class="row">
+                <div class="col">
+                    <div id="dropZone100" class="drop-zone">Drop DBASE100.DAT here or click to select<input id="file100" type="file" accept=".DAT,.dat" style="display:none"></div>
+                </div>
+                <div class="col">
+                    <div id="dropZone400" class="drop-zone">Drop DBASE400.DAT here or click to select<input id="file400" type="file" accept=".DAT,.dat" style="display:none"></div>
+                </div>
+            </div>
+            <div class="flex" style="margin-top:10px">
+                <button id="analyzeBtn">Analyze</button>
+                <span id="loadStatus" class="small muted">Waiting for files...</span>
+                <span id="fileInfo" class="small"></span>
+            </div>
+        </div>
+
+        <div class="grid">
+            <div class="panel">
+                <div class="flex" style="justify-content: space-between;">
+                    <div class="flex">
+                        <input id="searchBox" placeholder="Filter by name/opcode (e.g., Monster or 0x28)">
+                        <select id="typeFilter">
+                            <option value="">All types</option>
+                        </select>
+                        <button id="exportCsv">Export Inventory CSV</button>
+                        <button id="exportJson">Export Inventory JSON</button>
+                        <button id="exportItemLabels">Export Item Labels</button>
+                        <input id="importItemLabelsFile" type="file" accept="application/json" style="display:none">
+                        <button id="importItemLabels">Import Item Labels</button>
+                    </div>
+                    <div class="flex small">
+                        <span id="totals"></span>
+                    </div>
+                </div>
+                <div class="list">
+                    <table id="itemsTable">
+                        <thead>
+                            <tr>
+                                <th class="nowrap">Index</th>
+                                <th>Name</th>
+                                <th class="nowrap">ItemType</th>
+                                <th class="nowrap">Entry Offset</th>
+                                <th>Details</th>
+                                <th>Label</th>
+                                <th>Actions</th>
+                                <th>Inspect</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3 style="margin-top:0">Opcode Stats</h3>
+                <div class="flex" style="margin-bottom:8px">
+                    <input id="opcodeSearch" placeholder="Search opcode (e.g., 0x28 or 40)">
+                    <button id="showUsage">Show Usage</button>
+                </div>
+                <div class="flex small" style="margin-bottom:6px">
+                    <span id="opcodeCoverageText" class="muted">Coverage: —</span>
+                    <div class="progress"><div id="opcodeCoverageBar" class="progress-inner"></div></div>
+                </div>
+                <div class="list">
+                    <table id="opTable">
+                        <thead>
+                            <tr><th>Opcode</th><th>Dec</th><th>Count</th><th>Label</th><th>Note</th></tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <div class="list" style="margin-top:10px">
+                    <table id="usageTable">
+                        <thead>
+                            <tr><th>Opcode</th><th>Item Index</th><th>Name</th><th>Label</th><th>Type</th><th>Args</th><th>Item Offset</th><th>Action Offset</th></tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <div class="flex" style="margin-top:10px">
+                    <button id="exportNotes">Export Notes</button>
+                    <input id="importNotesFile" type="file" accept="application/json" style="display:none">
+                    <button id="importNotes">Import Notes</button>
+                    <button id="clearNotes">Clear Notes</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h3 style="margin-top:0">Trigger Analysis</h3>
+            <div class="flex" style="margin-bottom:8px">
+                <select id="triggerSelect">
+                    <option value="">Select trigger</option>
+                </select>
+                <button id="showTrigger">Analyze Trigger</button>
+                <button id="exportTriggerStats">Export Trigger Stats</button>
+            </div>
+            <div class="flex" style="margin-bottom:8px">
+                <input id="triggerLabel" placeholder="Trigger label (e.g., Inspect)"/>
+                <button id="saveTriggerLabel">Save Label</button>
+            </div>
+            <div id="triggerSummary" class="small muted">Select a trigger to see stats.</div>
+            <div class="row" style="margin-top:10px">
+                <div class="col">
+                    <div class="list">
+                        <table>
+                            <thead>
+                                <tr><th>Opcode</th><th>Count</th><th>Unique Args</th><th>Top Args</th></tr>
+                            </thead>
+                            <tbody id="triggerOpcodes"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="list">
+                        <table>
+                            <thead>
+                                <tr><th>Item</th><th>Label</th><th>Type</th><th>Section Offset</th><th>#Actions</th></tr>
+                            </thead>
+                            <tbody id="triggerItems"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h3 style="margin-top:0">Item Inspector</h3>
+            <div id="itemInspector">
+                <div class="muted small">Select an item from the inventory table and click Open.</div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h3 style="margin-top:0">Status</h3>
+            <div id="status" class="status">Idle.</div>
+        </div>
+    </div>
+
+    <script>
+    const statusEl = document.getElementById('status');
+    const loadStatus = document.getElementById('loadStatus');
+    const fileInfo = document.getElementById('fileInfo');
+    const itemsTableBody = document.querySelector('#itemsTable tbody');
+    const opTableBody = document.querySelector('#opTable tbody');
+    const usageTableBody = document.querySelector('#usageTable tbody');
+    const searchBox = document.getElementById('searchBox');
+    const typeFilter = document.getElementById('typeFilter');
+    const totalsEl = document.getElementById('totals');
+    const opcodeSearch = document.getElementById('opcodeSearch');
+
+    let dbase100Buffer = null;
+    let dbase400Buffer = null;
+    let analysis = null;
+
+    function toHex(num, width = 2) { return Number(num).toString(16).padStart(width, '0'); }
+    function decodeArgsBytes(argsBytes) { return argsBytes[0] + (argsBytes[1] << 8) + (argsBytes[2] << 16); }
+    const ITEM_TYPE_MAP = new Map([
+      [0x00, 'generic'],
+      [0x01, 'weapon'],
+      [0x02, 'characters'],
+      [0x03, 'magic items (?)'],
+      [0x04, 'books/notes/letters'],
+      [0x12, 'Adam Randall'],
+      [0x20, 'coin'],
+      [0x21, 'ammo'],
+      [0x40, 'interactive items'],
+      [0x43, 'consumable/wearable'],
+    ]);
+
+    function readDBASE400Interface(buffer, offset) {
+      const view = new DataView(buffer);
+      const dbase500Offset = view.getUint32(offset, true);
+      const stringLength = view.getUint16(offset + 0x04, true);
+      const fontColor = view.getUint16(offset + 0x06, true);
+      const bytes = new Uint8Array(buffer, offset + 0x08, stringLength);
+      const text = String.fromCharCode.apply(null, bytes);
+      return { dbase500Offset, stringLength, fontColor, text };
+    }
+
+    function buildOpcodeCatalog() {
+      return new Map([
+        [0x03, { label: 'ChainLen', note: 'Chain byte length (actions section)' }],
+        [0x13, { label: 'SetBullet', note: 'Weapon: set bullet inventory index' }],
+        [0x14, { label: 'SetAmmoCap', note: 'Weapon: set ammo capacity' }],
+        [0x24, { label: 'SetMoveSpeed', note: 'Monster: default move speed' }],
+        [0x25, { label: 'AIFlag?', note: 'Monster: unknown, affects AI' }],
+        [0x26, { label: 'SetHealth', note: 'Monster: default health' }],
+        [0x28, { label: 'SetProjectile', note: 'Monster: projectile (bullet) index (1-based)' }],
+      ]);
+    }
+
+    function getNotes() { try { return JSON.parse(localStorage.getItem('dbase100OpcodeNotes') || '{}'); } catch { return {}; } }
+    function setNotes(notes) { localStorage.setItem('dbase100OpcodeNotes', JSON.stringify(notes)); }
+
+    function analyzeInventory(dbase100) {
+      const opcodeCatalog = buildOpcodeCatalog();
+      const items = [];
+      const opcodeStats = new Map();
+      const bullets = [];
+      const monsters = [];
+      const opcodeUsages = {};
+      const triggerStats = new Map(); // triggerHex -> {sections, actions, opcodeCounts Map, opcodeArgs Map, items[]}
+
+      for (let i = 0; i < dbase100.inventoryLookupSection.entries.length; i++) {
+        const entry = dbase100.inventoryLookupSection.entries[i];
+        if (!entry.object) continue;
+        const inv = entry.object;
+        const nameEntry = readDBASE400Interface(dbase400Buffer, inv.nameOffset);
+        const name = nameEntry.text.split('\u0000')[0];
+        const entryOffset = dbase100.inventoryLookupSection.entries[i].inventoryEntryOffset >>> 0;
+        // Parse trigger-grouped command sections directly from the file buffer
+        const triggers = parseInventoryTriggers(dbase100Buffer, entryOffset, inv.length);
+        // Flattened actions for summary stats/filters
+        const actions = [];
+        for (const tg of triggers) {
+          for (const act of tg.actions) {
+            actions.push(act);
+          }
+        }
+
+        for (const a of actions) opcodeStats.set(a.command, (opcodeStats.get(a.command) || 0) + 1);
+        const item = {
+          index: i,
+          itemType: inv.itemType,
+          closeupType: inv.closeupType,
+          unk0x02: inv.unk0x02,
+          unk0x06: inv.unk0x06,
+          unk0x07: inv.unk0x07,
+          closeupImageOffset: inv.closeupImageOffset >>> 0,
+          inventoryImageOffset: inv.inventoryImageOffset >>> 0,
+          name,
+          nameOffset: inv.nameOffset >>> 0,
+          actions,
+          triggers,
+          itemTypeLabel: ITEM_TYPE_MAP.get(inv.itemType) || '',
+          entryOffset,
+        };
+        items.push(item);
+        if (name === 'Monster') monsters.push(item);
+        if (name === 'Bullet') bullets.push(item);
+
+        // Build opcode usage rows
+        for (const act of actions) {
+          const key = '0x' + toHex(act.command, 2);
+          if (!opcodeUsages[key]) opcodeUsages[key] = [];
+          opcodeUsages[key].push({
+            itemIndex: item.index,
+            itemName: item.name,
+            itemType: item.itemType,
+            entryOffset: '0x' + toHex(item.entryOffset, 8),
+            actionIndex: act.index,
+            argsHex: '0x' + toHex(act.args, 6),
+            argsDec: act.args,
+            fileOffset: '0x' + toHex(act.fileOffset, 8),
+            label: act.label || null,
+          });
+        }
+
+        // Build trigger-level stats
+        for (const tg of triggers) {
+          const tKey = '0x' + toHex(tg.triggerCode, 2);
+          if (!triggerStats.has(tKey)) {
+            triggerStats.set(tKey, { sections: 0, actions: 0, opcodeCounts: new Map(), opcodeArgs: new Map(), items: [] });
+          }
+          const ts = triggerStats.get(tKey);
+          ts.sections += 1;
+          ts.actions += tg.actions.length;
+          for (const a of tg.actions) {
+            ts.opcodeCounts.set(a.command, (ts.opcodeCounts.get(a.command) || 0) + 1);
+            const opKey = '0x' + toHex(a.command, 2);
+            if (!ts.opcodeArgs.has(opKey)) ts.opcodeArgs.set(opKey, new Map());
+            const argsKey = '0x' + toHex(a.args, 6);
+            const m = ts.opcodeArgs.get(opKey);
+            m.set(argsKey, (m.get(argsKey) || 0) + 1);
+          }
+          ts.items.push({ itemIndex: item.index, itemName: item.name, itemType: item.itemType, sectionOffset: '0x' + toHex(tg.sectionOffset, 8), numActions: tg.actions.length });
+        }
+      }
+
+      const monsterProjectileRefs = monsters.map(m => ({
+        monsterIndex: m.index,
+        bullets1Based: m.actions.filter(a => a.command === 0x28).map(a => a.args),
+      })).filter(x => x.bullets1Based.length > 0);
+
+      // Serialize triggerStats
+      const triggerStatsObj = {};
+      for (const [tKey, ts] of triggerStats.entries()) {
+        triggerStatsObj[tKey] = {
+          sections: ts.sections,
+          actions: ts.actions,
+          opcodeCounts: Object.fromEntries(ts.opcodeCounts),
+          opcodeArgs: Object.fromEntries(Array.from(ts.opcodeArgs.entries()).map(([op, mp]) => [op, Object.fromEntries(mp)])),
+          items: ts.items,
+        };
+      }
+      return { items, opcodeStats: Object.fromEntries(opcodeStats), bullets, monsters, monsterProjectileRefs, opcodeUsages, triggerStats: triggerStatsObj };
+    }
+
+    // Parse per-trigger command sections for an inventory item
+    function parseInventoryTriggers(buffer, entryOffset, totalLength) {
+      const view = new DataView(buffer);
+      const headerSize = 0x14; // 20 bytes header before command sections
+      const sections = [];
+      let pos = entryOffset + headerSize;
+      const end = entryOffset + totalLength;
+      while (pos + 4 <= end) {
+        const b0 = view.getUint8(pos);
+        const b1 = view.getUint8(pos + 1);
+        const b2 = view.getUint8(pos + 2);
+        const trig = view.getUint8(pos + 3);
+        // NULL terminator for item definition
+        if (b0 === 0 && b1 === 0 && b2 === 0 && trig === 0) {
+          break;
+        }
+        const sectionLen = b0 + (b1 << 8) + (b2 << 16);
+        const actionsByteLen = sectionLen - 4;
+        const actionsStart = pos + 4;
+        // Bounds/sanity
+        if (actionsByteLen < 0 || actionsStart + actionsByteLen > end) {
+          break;
+        }
+        const numActions = Math.floor(actionsByteLen / 4);
+        const actions = [];
+        for (let i = 0; i < numActions; i++) {
+          const aPos = actionsStart + i * 4;
+          const ab0 = view.getUint8(aPos);
+          const ab1 = view.getUint8(aPos + 1);
+          const ab2 = view.getUint8(aPos + 2);
+          const cmd = view.getUint8(aPos + 3);
+          const args = ab0 + (ab1 << 8) + (ab2 << 16);
+          actions.push({
+            index: i,
+            command: cmd,
+            argsBytes: [ab0, ab1, ab2],
+            args,
+            label: (buildOpcodeCatalog().get(cmd) || {}).label || null,
+            fileOffset: aPos >>> 0,
+          });
+        }
+        sections.push({
+          sectionOffset: pos >>> 0,
+          sectionLength: sectionLen,
+          triggerCode: trig,
+          actions,
+        });
+        pos = actionsStart + actionsByteLen;
+      }
+      return sections;
+    }
+
+    function render() {
+      if (!analysis) return;
+      const q = (searchBox.value || '').trim().toLowerCase();
+      const t = typeFilter.value;
+      const notes = getNotes();
+
+      // Items table
+      itemsTableBody.innerHTML = '';
+      let filtered = analysis.items;
+      if (t !== '') { const tNum = parseInt(t, 10); filtered = filtered.filter(it => it.itemType === tNum); }
+      if (q) {
+        filtered = filtered.filter(it => it.name.toLowerCase().includes(q) || it.actions.some(a => ('0x' + toHex(a.command)).includes(q)));
+      }
+      // Item labels from localStorage
+      let itemLabels = {};
+      try { itemLabels = JSON.parse(localStorage.getItem('dbase100ItemLabels') || '{}'); } catch {}
+
+      for (const it of filtered) {
+        const tr = document.createElement('tr');
+        // Render actions grouped by trigger
+        let triggerLabels = {}; try { triggerLabels = JSON.parse(localStorage.getItem('dbase100TriggerLabels') || '{}'); } catch {}
+        const triggerGroups = it.triggers.map(tg => {
+          const acts = tg.actions.map(a => `${toHex(a.args,6)}:${toHex(a.command,2)}${a.label?'['+a.label+']':''}`).join(' ');
+          const tKey = '0x'+toHex(tg.triggerCode,2);
+          const tLbl = triggerLabels[tKey] ? ` [${triggerLabels[tKey]}]` : '';
+          return `T=${toHex(tg.triggerCode,2)}${tLbl} { ${acts} }`;
+        }).join('  ');
+        const typeCell = `0x${toHex(it.itemType, 2)}${it.itemTypeLabel ? ' (' + it.itemTypeLabel + ')' : ''}`;
+        const entryOffsetHex = '0x' + toHex(it.entryOffset, 8);
+        const details = [
+          `closeupType=0x${toHex(it.closeupType,2)}`,
+          `unk0x02=0x${toHex(it.unk0x02,4)}`,
+          `unk0x06=0x${toHex(it.unk0x06,2)}`,
+          `unk0x07=0x${toHex(it.unk0x07,2)}`,
+          `closeupImgOff=0x${toHex(it.closeupImageOffset,8)}`,
+          `invImgOff=0x${toHex(it.inventoryImageOffset,8)}`,
+          `nameOff=0x${toHex(it.nameOffset,8)}`,
+        ].join(' ');
+        const itemKey = String(it.index);
+        const labelVal = itemLabels[itemKey] || '';
+        const isLabelEnabled = (it.name === 'Monster' || it.name === 'Bullet');
+        const labelCell = isLabelEnabled ? `<input data-item-label=\"${itemKey}\" value=\"${labelVal}\" placeholder=\"Add label (community name / weapon usage)\"/>` : '';
+        tr.innerHTML = `<td class=\"nowrap\">${it.index} <span class=\"pill\">0x${toHex(it.index + 1, 4)}</span></td><td>${it.name}</td><td class=\"nowrap\">${typeCell}</td><td class=\"nowrap\">${entryOffsetHex}</td><td class=\"small\" style=\"font-family:monospace\">${details}</td><td>${labelCell}</td><td style=\"font-family:monospace\">${triggerGroups}</td><td><button class=\"inspect-btn\" data-item=\"${it.index}\">Open</button></td>`;
+        itemsTableBody.appendChild(tr);
+      }
+      totalsEl.textContent = `Items: ${analysis.items.length} • Monsters: ${analysis.monsters.length} • Bullets: ${analysis.bullets.length}`;
+
+      // Opcode coverage
+      const coverageText = document.getElementById('opcodeCoverageText');
+      const coverageBar = document.getElementById('opcodeCoverageBar');
+      let storedLabels = {};
+      try { storedLabels = JSON.parse(localStorage.getItem('dbase100OpcodeLabels') || '{}'); } catch {}
+      const opcodeKeys = Object.keys(analysis.opcodeStats);
+      const documented = opcodeKeys.filter(k => {
+        const dec = Number(k);
+        const opHex = '0x' + toHex(dec, 2);
+        const label = storedLabels[opHex] || (buildOpcodeCatalog().get(dec)?.label || '');
+        const note = (getNotes())[opHex] || '';
+        return (label && label.trim().length > 0) || (note && note.trim().length > 0);
+      }).length;
+      const pct = opcodeKeys.length ? Math.round((documented / opcodeKeys.length) * 100) : 0;
+      coverageText.textContent = `Coverage: ${documented}/${opcodeKeys.length} (${pct}%)`;
+      coverageBar.style.width = `${pct}%`;
+
+      // Opcode table
+      opTableBody.innerHTML = '';
+      const entries = Object.entries(analysis.opcodeStats).sort((a,b)=>Number(a[0]) - Number(b[0]));
+
+      for (const [opStr, count] of entries) {
+        const opcode = Number(opStr);
+        const key = '0x' + toHex(opcode, 2);
+        const tr = document.createElement('tr');
+        const noteVal = notes[key] || '';
+        const labelDefault = buildOpcodeCatalog().get(opcode)?.label || '';
+        const labelVal = storedLabels[key] || labelDefault;
+        tr.innerHTML = `<td class=\"nowrap\">${key}</td><td>${opcode}</td><td>${count}</td><td><input data-label=\"${key}\" value=\"${labelVal}\" placeholder=\"Label\"/></td><td><textarea data-op=\"${key}\" rows=\"2\" style=\"width:100%\" placeholder=\"Add note...\">${noteVal}</textarea></td>`;
+        opTableBody.appendChild(tr);
+      }
+
+      // Wire note handlers
+      opTableBody.querySelectorAll('textarea[data-op]').forEach(el => {
+        el.addEventListener('change', () => {
+          const n = getNotes();
+          n[el.dataset.op] = el.value;
+          setNotes(n);
+        });
+      });
+
+      // Wire label editors
+      opTableBody.querySelectorAll('input[data-label]').forEach(el => {
+        el.addEventListener('change', () => {
+          try {
+            const labels = JSON.parse(localStorage.getItem('dbase100OpcodeLabels') || '{}');
+            labels[el.dataset.label] = el.value;
+            localStorage.setItem('dbase100OpcodeLabels', JSON.stringify(labels));
+          } catch {}
+        });
+      });
+
+      // Wire item label editors
+      itemsTableBody.querySelectorAll('input[data-item-label]').forEach(el => {
+        el.addEventListener('change', () => {
+          try {
+            const labels = JSON.parse(localStorage.getItem('dbase100ItemLabels') || '{}');
+            labels[el.dataset.itemLabel] = el.value;
+            localStorage.setItem('dbase100ItemLabels', JSON.stringify(labels));
+          } catch {}
+        });
+      });
+
+      // Wire item inspector
+      itemsTableBody.querySelectorAll('button.inspect-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const idx = parseInt(btn.dataset.item, 10);
+          const item = analysis.items.find(x => x.index === idx);
+          if (!item) return;
+          renderItemInspector(item);
+        });
+      });
+    }
+
+    async function loadFile(inputEl, dropEl, cb) {
+      function setDrag(el, on) { el.classList[on ? 'add' : 'remove']('dragover'); }
+      dropEl.addEventListener('dragover', (e) => { e.preventDefault(); setDrag(dropEl, true); });
+      dropEl.addEventListener('dragleave', () => setDrag(dropEl, false));
+      dropEl.addEventListener('drop', async (e) => {
+        e.preventDefault(); setDrag(dropEl, false);
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) { const buf = await e.dataTransfer.files[0].arrayBuffer(); cb(buf, e.dataTransfer.files[0].name); }
+      });
+      dropEl.addEventListener('click', () => inputEl.click());
+      inputEl.addEventListener('change', async () => { if (inputEl.files && inputEl.files[0]) { const buf = await inputEl.files[0].arrayBuffer(); cb(buf, inputEl.files[0].name); } });
+    }
+
+    // Populate type filter options
+    (function populateTypeFilter(){
+      const entries = Array.from(ITEM_TYPE_MAP.entries()).sort((a,b)=>a[0]-b[0]);
+      for (const [code, label] of entries) {
+        const opt = document.createElement('option');
+        opt.value = String(code);
+        opt.textContent = `0x${toHex(code,2)} ${label}`;
+        typeFilter.appendChild(opt);
+      }
+    })();
+
+    loadFile(document.getElementById('file100'), document.getElementById('dropZone100'), (buf, name) => { dbase100Buffer = buf; loadStatus.textContent = 'DBASE100 loaded.'; fileInfo.textContent = `100: ${name}`; });
+    loadFile(document.getElementById('file400'), document.getElementById('dropZone400'), (buf, name) => { dbase400Buffer = buf; loadStatus.textContent = 'DBASE400 loaded.'; fileInfo.textContent += ` | 400: ${name}`; });
+
+    document.getElementById('analyzeBtn').addEventListener('click', () => {
+      if (!dbase100Buffer || !dbase400Buffer) { statusEl.textContent = 'Please load both DBASE100.DAT and DBASE400.DAT.'; return; }
+      try {
+        statusEl.textContent = 'Parsing...';
+        const d100 = new Dbase100File(new KaitaiStream(dbase100Buffer));
+        analysis = analyzeInventory(d100);
+        statusEl.textContent = 'Parsed successfully. Rendering tables...';
+        render();
+        populateTriggerSelect();
+        statusEl.textContent = 'Done.';
+      } catch (e) {
+        console.error(e);
+        statusEl.textContent = 'Error: ' + e.message;
+      }
+    });
+
+    searchBox.addEventListener('input', render);
+    typeFilter.addEventListener('change', render);
+
+    // Populate trigger dropdown from analysis
+    function populateTriggerSelect() {
+      const sel = document.getElementById('triggerSelect');
+      sel.innerHTML = '';
+      const def = document.createElement('option'); def.value = ''; def.textContent = 'Select trigger'; sel.appendChild(def);
+      if (!analysis || !analysis.triggerStats) return;
+      let triggerLabels = {}; try { triggerLabels = JSON.parse(localStorage.getItem('dbase100TriggerLabels') || '{}'); } catch {}
+      const keys = Object.keys(analysis.triggerStats).sort();
+      for (const k of keys) { const opt = document.createElement('option'); opt.value = k; opt.textContent = triggerLabels[k] ? `${k} [${triggerLabels[k]}]` : `${k}`; sel.appendChild(opt); }
+    }
+
+    // Render trigger analysis
+    document.getElementById('showTrigger').addEventListener('click', () => {
+      const sel = document.getElementById('triggerSelect');
+      const key = sel.value;
+      const tbodyOps = document.getElementById('triggerOpcodes');
+      const tbodyItems = document.getElementById('triggerItems');
+      const summary = document.getElementById('triggerSummary');
+      const labelInput = document.getElementById('triggerLabel');
+      tbodyOps.innerHTML = ''; tbodyItems.innerHTML = '';
+      if (!key || !analysis || !analysis.triggerStats || !analysis.triggerStats[key]) { summary.textContent = 'Select a trigger to see stats.'; return; }
+      const ts = analysis.triggerStats[key];
+      let triggerLabels = {}; try { triggerLabels = JSON.parse(localStorage.getItem('dbase100TriggerLabels') || '{}'); } catch {}
+      const currentLabel = triggerLabels[key] || '';
+      labelInput.value = currentLabel;
+      summary.textContent = `Trigger ${key}${currentLabel ? ' ['+currentLabel+']' : ''} • Sections: ${ts.sections} • Actions: ${ts.actions}`;
+      // Opcodes table
+      const entries = Object.entries(ts.opcodeCounts).sort((a,b)=>b[1]-a[1]);
+      for (const [opcodeDecStr, count] of entries) {
+        const opcode = Number(opcodeDecStr);
+        const opHex = '0x' + toHex(opcode, 2);
+        const tr = document.createElement('tr');
+        const argMap = ts.opcodeArgs[opHex] || {};
+        const uniqueArgs = Object.keys(argMap).length;
+        const topArgs = Object.entries(argMap).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([a,c])=>`${a}(${c})`).join(' ');
+        tr.innerHTML = `<td class="nowrap">${opHex}</td><td>${count}</td><td>${uniqueArgs}</td><td style="font-family:monospace">${topArgs}</td>`;
+        tbodyOps.appendChild(tr);
+      }
+      // Items table
+      let itemLabels = {}; try { itemLabels = JSON.parse(localStorage.getItem('dbase100ItemLabels') || '{}'); } catch {}
+      for (const it of ts.items) {
+        const tr = document.createElement('tr');
+        const lbl = itemLabels[String(it.itemIndex)] || '';
+        tr.innerHTML = `<td>${it.itemIndex} - ${it.itemName}</td><td>${lbl}</td><td>0x${toHex(it.itemType,2)}</td><td>${it.sectionOffset}</td><td>${it.numActions}</td>`;
+        tbodyItems.appendChild(tr);
+      }
+    });
+
+    // Export trigger stats
+    document.getElementById('exportTriggerStats').addEventListener('click', () => {
+      if (!analysis || !analysis.triggerStats) return;
+      const data = analysis.triggerStats;
+      download('dbase100_trigger_stats.json', JSON.stringify(data, null, 2));
+    });
+
+    // Save trigger label
+    document.getElementById('saveTriggerLabel').addEventListener('click', () => {
+      const sel = document.getElementById('triggerSelect');
+      const key = sel.value;
+      if (!key) return;
+      const input = document.getElementById('triggerLabel');
+      try {
+        const labels = JSON.parse(localStorage.getItem('dbase100TriggerLabels') || '{}');
+        labels[key] = input.value || '';
+        localStorage.setItem('dbase100TriggerLabels', JSON.stringify(labels));
+        populateTriggerSelect();
+        document.getElementById('showTrigger').click();
+        render(); // refresh item list trigger labels
+      } catch {}
+    });
+
+    // Show opcode usage details
+    document.getElementById('showUsage').addEventListener('click', () => {
+      usageTableBody.innerHTML = '';
+      if (!analysis) return;
+      let val = (opcodeSearch.value || '').trim().toLowerCase();
+      if (!val) return;
+      let key;
+      if (val.startsWith('0x')) {
+        key = val;
+      } else {
+        const num = parseInt(val, 10);
+        if (Number.isNaN(num)) return; key = '0x' + toHex(num, 2);
+      }
+      const rows = (analysis.opcodeUsages && analysis.opcodeUsages[key]) || [];
+      let itemLabels = {};
+      try { itemLabels = JSON.parse(localStorage.getItem('dbase100ItemLabels') || '{}'); } catch {}
+      for (const u of rows) {
+        const tr = document.createElement('tr');
+        const lbl = itemLabels[String(u.itemIndex)] || '';
+        tr.innerHTML = `<td class="nowrap">${key}</td><td>${u.itemIndex}</td><td>${u.itemName}</td><td>${lbl}</td><td>0x${toHex(u.itemType,2)}</td><td>${u.argsHex} (${u.argsDec})</td><td>${u.entryOffset}</td><td>${u.fileOffset}</td>`;
+        usageTableBody.appendChild(tr);
+      }
+    });
+
+    // Export buttons
+    function download(filename, text) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'text/plain' })); a.download = filename; a.click(); }
+    document.getElementById('exportCsv').addEventListener('click', () => {
+      if (!analysis) return; const rows = [['INDEX','INDEX_REF','ITEM_TYPE','NAME','ACTION_COUNT','ACTIONS']];
+      for (const it of analysis.items) { const actionsStr = it.actions.map(a => `${toHex(a.args,6)}:${toHex(a.command,2)}${a.label?'['+a.label+']':''}`).join(' ');
+        rows.push([it.index, '0x'+toHex(it.index+1,4), it.itemType, it.name, it.actions.length, actionsStr]); }
+      const csv = rows.map(r => r.map(v => String(v).includes(',')||String(v).includes('"')?`"${String(v).replace(/"/g,'""')}"`:String(v)).join(',')).join('\n');
+      download('dbase100_inventory.csv', csv);
+    });
+    document.getElementById('exportJson').addEventListener('click', () => { if (!analysis) return; download('dbase100_inventory.json', JSON.stringify(analysis.items, null, 2)); });
+
+    // Item label import/export
+    document.getElementById('exportItemLabels').addEventListener('click', () => {
+      let labels = {};
+      try { labels = JSON.parse(localStorage.getItem('dbase100ItemLabels') || '{}'); } catch {}
+      download('dbase100_item_labels.json', JSON.stringify(labels, null, 2));
+    });
+    document.getElementById('importItemLabels').addEventListener('click', () => {
+      document.getElementById('importItemLabelsFile').click();
+    });
+    document.getElementById('importItemLabelsFile').addEventListener('change', async (e) => {
+      const f = e.target.files && e.target.files[0]; if (!f) return;
+      try { const txt = await f.text(); const data = JSON.parse(txt); localStorage.setItem('dbase100ItemLabels', JSON.stringify(data)); render(); statusEl.textContent = 'Item labels imported.'; } catch(err) { statusEl.textContent = 'Failed to import item labels: ' + err.message; }
+    });
+
+    // Notes import/export
+    // Export/import combined annotations (notes + all labels)
+    function getJsonStorage(key) { try { return JSON.parse(localStorage.getItem(key) || '{}'); } catch { return {}; } }
+    document.getElementById('exportNotes').addEventListener('click', () => {
+      const notes = getNotes();
+      const opcodeLabels = getJsonStorage('dbase100OpcodeLabels');
+      const itemLabels = getJsonStorage('dbase100ItemLabels');
+      const triggerLabels = getJsonStorage('dbase100TriggerLabels');
+      // Build combined per-opcode object: { [opcodeHex]: { label, note } }
+      const opcodes = {};
+      const keys = new Set([...Object.keys(notes), ...Object.keys(opcodeLabels)]);
+      for (const k of keys) {
+        opcodes[k] = { label: opcodeLabels[k] || '', note: notes[k] || '' };
+      }
+      const payload = {
+        schemaVersion: 1,
+        exportedAt: new Date().toISOString(),
+        // unified opcodes map preferred
+        opcodes,
+        // keep legacy fields for backwards-compat
+        notes,
+        opcodeLabels,
+        itemLabels,
+        triggerLabels,
+      };
+      download('dbase100_annotations.json', JSON.stringify(payload, null, 2));
+    });
+    document.getElementById('importNotes').addEventListener('click', () => { document.getElementById('importNotesFile').click(); });
+    document.getElementById('importNotesFile').addEventListener('change', async (e) => {
+      const f = e.target.files && e.target.files[0]; if (!f) return;
+      try {
+        const txt = await f.text();
+        const data = JSON.parse(txt);
+        // Backward compatibility: if file is just notes, keep old behavior
+        if (data && !data.schemaVersion && !data.notes && typeof data === 'object') {
+          setNotes(data);
+          statusEl.textContent = 'Legacy notes imported.';
+        } else {
+          // New preferred: combined opcodes
+          if (data.opcodes && typeof data.opcodes === 'object') {
+            const newNotes = {};
+            const newLabels = {};
+            for (const [k, v] of Object.entries(data.opcodes)) {
+              if (v && typeof v === 'object') {
+                if (typeof v.note === 'string') newNotes[k] = v.note;
+                if (typeof v.label === 'string') newLabels[k] = v.label;
+              }
+            }
+            setNotes(newNotes);
+            localStorage.setItem('dbase100OpcodeLabels', JSON.stringify(newLabels));
+          } else {
+            // Fallback to legacy fields
+            if (data.notes) setNotes(data.notes); else setNotes({});
+            if (data.opcodeLabels) localStorage.setItem('dbase100OpcodeLabels', JSON.stringify(data.opcodeLabels));
+          }
+          if (data.itemLabels) localStorage.setItem('dbase100ItemLabels', JSON.stringify(data.itemLabels));
+          if (data.triggerLabels) localStorage.setItem('dbase100TriggerLabels', JSON.stringify(data.triggerLabels));
+          statusEl.textContent = 'Annotations imported.';
+        }
+        populateTriggerSelect();
+        render();
+      } catch(err) { statusEl.textContent = 'Failed to import annotations: ' + err.message; }
+    });
+    document.getElementById('clearNotes').addEventListener('click', () => { setNotes({}); render(); statusEl.textContent = 'Notes cleared.'; });
+
+    function renderItemInspector(it) {
+      const el = document.getElementById('itemInspector');
+      let opcodeLabels = {}; try { opcodeLabels = JSON.parse(localStorage.getItem('dbase100OpcodeLabels') || '{}'); } catch {}
+      let itemLabels = {}; try { itemLabels = JSON.parse(localStorage.getItem('dbase100ItemLabels') || '{}'); } catch {}
+      let triggerLabels = {}; try { triggerLabels = JSON.parse(localStorage.getItem('dbase100TriggerLabels') || '{}'); } catch {}
+      const itemLabel = itemLabels[String(it.index)] || '';
+      const header = `
+        <div class="flex">
+          <div><strong>Index:</strong> ${it.index} <span class="pill">0x${toHex(it.index+1,4)}</span></div>
+          <div><strong>Name:</strong> ${it.name}</div>
+          <div><strong>Label:</strong> ${itemLabel || '<span class=\"muted\">(none)</span>'}</div>
+        </div>
+        <div class="flex small">
+          <div>Type: 0x${toHex(it.itemType,2)}${it.itemTypeLabel? ' ('+it.itemTypeLabel+')':''}</div>
+          <div>Entry: 0x${toHex(it.entryOffset,8)}</div>
+          <div>CloseupImg: 0x${toHex(it.closeupImageOffset,8)}</div>
+          <div>InvImg: 0x${toHex(it.inventoryImageOffset,8)}</div>
+          <div>NameOff: 0x${toHex(it.nameOffset,8)}</div>
+        </div>
+      `;
+      // Render triggers and chains with opcode labels
+      const triggerBlocks = it.triggers.map(tg => {
+        const chain = tg.actions.map(a => {
+          const opHex = '0x'+toHex(a.command,2);
+          const lbl = opcodeLabels[opHex] || (buildOpcodeCatalog().get(a.command)?.label || '');
+          return `<div> - ${opHex}${lbl? ' ['+lbl+']':''} args=0x${toHex(a.args,6)} (dec ${a.args}) @${'0x'+toHex(a.fileOffset,8)}</div>`;
+        }).join('');
+        const tKey = '0x' + toHex(tg.triggerCode, 2);
+        const tLbl = triggerLabels[tKey] || '';
+        return `
+          <div class="panel" style="background:#2b2b2b">
+            <div><strong>Trigger:</strong> 0x${toHex(tg.triggerCode,2)}${tLbl ? ' ['+tLbl+']' : ''} <span class="small muted">section ${'0x'+toHex(tg.sectionOffset,8)} len ${tg.sectionLength}</span></div>
+            <div style="font-family:monospace">${chain || '<span class=\"muted\">(no actions)</span>'}</div>
+          </div>
+        `;
+      }).join('');
+      el.innerHTML = header + triggerBlocks;
+    }
+    </script>
+</body>
+<!--
+Open this file directly in a browser. Drag-drop DBASE100.DAT and DBASE400.DAT.
+No build step required. The Kaitai parser is embedded above.
+-->
+</html>
+
+

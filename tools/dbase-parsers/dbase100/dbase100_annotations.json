@@ -1,0 +1,289 @@
+{
+  "schemaVersion": 1,
+  "exportedAt": "2025-09-02T12:21:54.346Z",
+  "opcodes": {
+    "0x16": {
+      "label": "TravelSpeed",
+      "note": "the speed that the projectile travels at"
+    },
+    "0x17": {
+      "label": "BulletHitAnimation",
+      "note": "The animation to play when projectile hits something (index? but doesn't appear in DEMO.DAS or ADEMO.DAS)"
+    },
+    "0x19": {
+      "label": "Play SFX",
+      "note": "Index in FXSCRIPT.SFX"
+    },
+    "0x30": {
+      "label": "FlashScreen",
+      "note": "Flashes the environment. First darkness then brightness. Value is the intensity"
+    },
+    "0x15": {
+      "label": "MaxDamage",
+      "note": "The max damage caused (anywhere from 0.5x-1.0x)"
+    },
+    "0x08": {
+      "label": "Choice string",
+      "note": "DBASE400 offset"
+    },
+    "0x02": {
+      "label": "If has item, continue",
+      "note": "Item index"
+    },
+    "0x09": {
+      "label": "Start choice sequence",
+      "note": "FF FF FF"
+    },
+    "0x0a": {
+      "label": "End choice sequence",
+      "note": "FF FF FF"
+    },
+    "0x11": {
+      "label": "Give item",
+      "note": "Item index"
+    },
+    "0x1c": {
+      "label": "?",
+      "note": "always FF FF FF"
+    },
+    "0x1d": {
+      "label": "Jump to command",
+      "note": "DBASE100 command index"
+    },
+    "0x33": {
+      "label": "WeaponIconUI",
+      "note": "Which icon to display on screen for an equipped weapon (0x0A is unused Mace)"
+    },
+    "0x2d": {
+      "label": "?",
+      "note": "weapons = 0x05, monsters = 0x02 or 0x03"
+    },
+    "0x20": {
+      "label": "WeaponAmmoRecharge",
+      "note": "the inventory index of the ammo refill.\nwhen second byte is 80, it's a rechargeable weapon and the first byte represents ammo recharge rate"
+    },
+    "0x12": {
+      "label": "WeaponAnimation",
+      "note": "The passive and attacking weapon animation. Offset to the animation"
+    },
+    "0x18": {
+      "label": "WeaponBulletDelay",
+      "note": "For weapon, the delay after firing to spawn the bullet object"
+    },
+    "0xa2": {
+      "label": "Weapon X screen offset",
+      "note": "offsets the weapon's onscreen horizontal position (affects where projectile is fired)"
+    },
+    "0x2c": {
+      "label": "WeaponAnimationSpeed",
+      "note": "for a weapon, modifies the animation play speed (directly impacts fire rate)"
+    },
+    "0x00": {
+      "label": "InventoryDocumentImage",
+      "note": "for notes/maps/etc, the image to show after initial animation"
+    },
+    "0xa8": {
+      "label": "SetMonsterSecondaryBullet",
+      "note": "sets the bullet for a monster's secondary attack"
+    },
+    "0x28": {
+      "label": "SetMonsterBullet",
+      "note": "sets the bullet for a monster's primary attack"
+    },
+    "0xa7": {
+      "label": "BulletVulnerable",
+      "note": "For a monster, set vulnerability against a bullet (bullet does 2x damage). this can stack"
+    },
+    "0x27": {
+      "label": "BulletResistance",
+      "note": "For a monster, sets the resistance against a bullet by index (bullet does no damage)"
+    },
+    "0xa9": {
+      "label": "OnMonsterDamageSFX",
+      "note": "For a monster, what sound effect to play on damage (when run multiple times, randomly chooses one) (bugged? when multiple are selected, will not play the last one? need to add it twice)"
+    },
+    "0x29": {
+      "label": "MonsterRoamingSFX",
+      "note": "sets the sound effect to play during enemy roam (multiple can be set with multiple calls)"
+    },
+    "0xb1": {
+      "label": "MonsterCritDeathSFX",
+      "note": "The sound effect to play when monster critically dies (like from max health in a single hit)"
+    },
+    "0x31": {
+      "label": "MonsterDeathSFX",
+      "note": "the sound effect to play when the monster dies (but not critically dies, see 0xB1)"
+    },
+    "0x2a": {
+      "label": "MonsterPrimAttackSFX",
+      "note": "sets the sound effect to play when monster makes its primary attack"
+    },
+    "0x2b": {
+      "label": "MonsterPrimAttackDelay",
+      "note": "the delay to spawn the bullet for an monster's primary attack"
+    },
+    "0xaa": {
+      "label": "MonsterSecondAttackSFX",
+      "note": "the sound effect to play when monster makes its secondary attack"
+    },
+    "0xab": {
+      "label": "MonsterSecondAttackDelay",
+      "note": "the delay to spawn the bullet for a monster's secondary attack"
+    },
+    "0x32": {
+      "label": "MonsterSpawnSFX",
+      "note": "the sound effect to play when the monster spawns"
+    },
+    "0x05": {
+      "label": "Play Audio Dialog",
+      "note": "DBASE400 offset"
+    },
+    "0x25": {
+      "label": "MonsterPathingFlag?",
+      "note": "Slightly influencing a monster's movement/pathing"
+    },
+    "0x26": {
+      "label": "SetHealthOrHeal",
+      "note": "Initializes max health of a monster or heals by value"
+    },
+    "0x04": {
+      "label": "Set flag",
+      "note": ""
+    },
+    "0x0d": {
+      "label": "If flag set, then next command",
+      "note": ""
+    },
+    "0x81": {
+      "label": "If not flag set, continue",
+      "note": ""
+    },
+    "0x82": {
+      "label": "If not item has, continue",
+      "note": ""
+    },
+    "0x8d": {
+      "label": "If not flag set, next command",
+      "note": ""
+    },
+    "0x01": {
+      "label": "If flag set, continue",
+      "note": ""
+    },
+    "0x13": {
+      "label": "SetWeaponBullet",
+      "note": ""
+    },
+    "0x24": {
+      "label": "SetMonsterMoveSpeed",
+      "note": ""
+    }
+  },
+  "notes": {
+    "0x16": "the speed that the projectile travels at",
+    "0x17": "The animation to play when projectile hits something (index? but doesn't appear in DEMO.DAS or ADEMO.DAS)",
+    "0x19": "Index in FXSCRIPT.SFX",
+    "0x30": "Flashes the environment. First darkness then brightness. Value is the intensity",
+    "0x15": "The max damage caused (anywhere from 0.5x-1.0x)",
+    "0x08": "DBASE400 offset",
+    "0x02": "Item index",
+    "0x09": "FF FF FF",
+    "0x0a": "FF FF FF",
+    "0x11": "Item index",
+    "0x1c": "always FF FF FF",
+    "0x1d": "DBASE100 command index",
+    "0x33": "Which icon to display on screen for an equipped weapon (0x0A is unused Mace)",
+    "0x2d": "weapons = 0x05, monsters = 0x02 or 0x03",
+    "0x20": "the inventory index of the ammo refill.\nwhen second byte is 80, it's a rechargeable weapon and the first byte represents ammo recharge rate",
+    "0x12": "The passive and attacking weapon animation. Offset to the animation",
+    "0x18": "For weapon, the delay after firing to spawn the bullet object",
+    "0xa2": "offsets the weapon's onscreen horizontal position (affects where projectile is fired)",
+    "0x2c": "for a weapon, modifies the animation play speed (directly impacts fire rate)",
+    "0x00": "for notes/maps/etc, the image to show after initial animation",
+    "0xa8": "sets the bullet for a monster's secondary attack",
+    "0x28": "sets the bullet for a monster's primary attack",
+    "0xa7": "For a monster, set vulnerability against a bullet (bullet does 2x damage). this can stack",
+    "0x27": "For a monster, sets the resistance against a bullet by index (bullet does no damage)",
+    "0xa9": "For a monster, what sound effect to play on damage (when run multiple times, randomly chooses one) (bugged? when multiple are selected, will not play the last one? need to add it twice)",
+    "0x29": "sets the sound effect to play during enemy roam (multiple can be set with multiple calls)",
+    "0xb1": "The sound effect to play when monster critically dies (like from max health in a single hit)",
+    "0x31": "the sound effect to play when the monster dies (but not critically dies, see 0xB1)",
+    "0x2a": "sets the sound effect to play when monster makes its primary attack",
+    "0x2b": "the delay to spawn the bullet for an monster's primary attack",
+    "0xaa": "the sound effect to play when monster makes its secondary attack",
+    "0xab": "the delay to spawn the bullet for a monster's secondary attack",
+    "0x32": "the sound effect to play when the monster spawns",
+    "0x05": "DBASE400 offset",
+    "0x25": "Slightly influencing a monster's movement/pathing",
+    "0x26": "Initializes max health of a monster or heals by value"
+  },
+  "opcodeLabels": {
+    "0x15": "MaxDamage",
+    "0x16": "TravelSpeed",
+    "0x17": "BulletHitAnimation",
+    "0x19": "Play SFX",
+    "0x30": "FlashScreen",
+    "0x28": "SetMonsterBullet",
+    "0x05": "Play Audio Dialog",
+    "0x00": "InventoryDocumentImage",
+    "0x02": "If has item, continue",
+    "0x04": "Set flag",
+    "0x08": "Choice string",
+    "0x09": "Start choice sequence",
+    "0x0a": "End choice sequence",
+    "0x0d": "If flag set, then next command",
+    "0x11": "Give item",
+    "0x1c": "?",
+    "0x1d": "Jump to command",
+    "0x81": "If not flag set, continue",
+    "0x82": "If not item has, continue",
+    "0x8d": "If not flag set, next command",
+    "0x33": "WeaponIconUI",
+    "0x2d": "?",
+    "0x20": "WeaponAmmoRecharge",
+    "0x12": "WeaponAnimation",
+    "0x18": "WeaponBulletDelay",
+    "0x01": "If flag set, continue",
+    "0xa2": "Weapon X screen offset",
+    "0x2c": "WeaponAnimationSpeed",
+    "0xa8": "SetMonsterSecondaryBullet",
+    "0xa7": "BulletVulnerable",
+    "0x27": "BulletResistance",
+    "0xa9": "OnMonsterDamageSFX",
+    "0x29": "MonsterRoamingSFX",
+    "0xb1": "MonsterCritDeathSFX",
+    "0x31": "MonsterDeathSFX",
+    "0x2a": "MonsterPrimAttackSFX",
+    "0x2b": "MonsterPrimAttackDelay",
+    "0xaa": "MonsterSecondAttackSFX",
+    "0xab": "MonsterSecondAttackDelay",
+    "0x32": "MonsterSpawnSFX",
+    "0x13": "SetWeaponBullet",
+    "0x24": "SetMonsterMoveSpeed",
+    "0x25": "MonsterPathingFlag?",
+    "0x26": "SetHealthOrHeal"
+  },
+  "itemLabels": {
+    "30": "Pyrichiel",
+    "58": "for Staff",
+    "60": "for Colt-45",
+    "61": "for Shotgun",
+    "63": "for Gun (Fintlock)",
+    "90": "Yielder (Minor)",
+    "93": "Yielder (Major)",
+    "111": "for Yielder (Minor)",
+    "231": "Wand",
+    "249": "Fire Demon",
+    "253": "for Chalice",
+    "254": "for Aelf's Dagger",
+    "256": "Dodger"
+  },
+  "triggerLabels": {
+    "0x04": "OnInspect",
+    "0x05": "WeaponAction",
+    "0x06": "AsBullet",
+    "0x07": "Document",
+    "0x0b": "OnUse",
+    "0x0a": "AsMonster"
+  }
+}
