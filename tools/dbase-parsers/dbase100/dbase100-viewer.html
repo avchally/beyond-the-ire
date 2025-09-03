@@ -253,6 +253,77 @@
             </div>
         </div>
 
+        <div class="panel" id="panel-flows">
+            <h3>
+                Global Command Flows
+                <button class="panel-toggle" data-target="panel-flows-contents">Collapse</button>
+            </h3>
+            <div id="panel-flows-contents">
+                <div class="flex" style="margin-bottom:8px">
+                    <input id="flowSearch" placeholder="Filter by opcode (e.g., 0x03) or index (dec/hex)"/>
+                    <button id="refreshFlows">Refresh</button>
+                </div>
+                <div class="flex" style="margin-bottom:8px">
+                    <span id="flowLabelTarget" class="small muted">No flow selected</span>
+                    <input id="flowLabel" placeholder="Flow label"/>
+                    <button id="saveFlowLabel">Save Flow Label</button>
+                </div>
+                <div class="list">
+                    <table id="flowsTable">
+                        <thead>
+                            <tr><th>#</th><th>Label</th><th>Offset</th><th>Actions</th></tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel" id="panel-flow-inspector">
+            <h3>
+                Command Flow Inspector
+                <button class="panel-toggle" data-target="panel-flow-inspector-body">Collapse</button>
+            </h3>
+            <div id="panel-flow-inspector-body">
+                <div class="muted small">Click a flow row to inspect.</div>
+                <div id="flowInspector"></div>
+            </div>
+        </div>
+
+        <div class="panel" id="panel-flow-stats">
+            <h3>
+                Command Flow Analysis
+                <button class="panel-toggle" data-target="panel-flow-stats-body">Collapse</button>
+            </h3>
+            <div id="panel-flow-stats-body">
+                <div id="flowStatsSummary" class="small muted">No data yet.</div>
+                <div class="row" style="margin-top:10px">
+                    <div class="col">
+                        <div class="list">
+                            <table>
+                                <thead><tr><th>Length</th><th>Count</th></tr></thead>
+                                <tbody id="flowLengthTable"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="list">
+                            <table>
+                                <thead><tr><th>Start Opcode</th><th>Count</th></tr></thead>
+                                <tbody id="flowStartTable"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="list" style="margin-top:10px">
+                    <table>
+                        <thead><tr><th>Opcode</th><th>Count</th><th>Top Args</th></tr></thead>
+                        <tbody id="flowOpcodeTable"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
         <div class="panel">
             <h3 style="margin-top:0">Status</h3>
             <div id="status" class="status">Idle.</div>
@@ -323,6 +394,15 @@
       const monsters = [];
       const opcodeUsages = {};
       const triggerStats = new Map(); // triggerHex -> {sections, actions, opcodeCounts Map, opcodeArgs Map, items[]}
+      const commandFlows = [];
+      const commandStatsAgg = {
+        opcodeCounts: new Map(),
+        opcodeArgs: new Map(), // opHex -> Map(argsHex -> count)
+        lengthCounts: new Map(), // length -> count
+        startOpcodeCounts: new Map(),
+        totalFlows: 0,
+        totalActions: 0,
+      };
 
       for (let i = 0; i < dbase100.inventoryLookupSection.entries.length; i++) {
         const entry = dbase100.inventoryLookupSection.entries[i];
@@ -389,6 +469,8 @@
           ts.sections += 1;
           ts.actions += tg.actions.length;
           for (const a of tg.actions) {
+            // 1-index display: adjust index for presentation only; keep storage unchanged
+            a.displayIndex = a.index + 1;
             ts.opcodeCounts.set(a.command, (ts.opcodeCounts.get(a.command) || 0) + 1);
             const opKey = '0x' + toHex(a.command, 2);
             if (!ts.opcodeArgs.has(opKey)) ts.opcodeArgs.set(opKey, new Map());
@@ -405,6 +487,80 @@
         bullets1Based: m.actions.filter(a => a.command === 0x28).map(a => a.args),
       })).filter(x => x.bullets1Based.length > 0);
 
+      // Parse global DBASE100 command flows (actions section)
+      try {
+        const flows = dbase100.actionsLookupSection.entries || [];
+        for (let i = 0; i < flows.length; i++) {
+          const entry = flows[i];
+          const chain = entry.actionChain;
+          const offset = entry.actionOffset >>> 0;
+          const chainActions = [];
+          if (chain && chain.entryAction) {
+            const entryAct = chain.entryAction;
+            chainActions.push({
+              index: 0,
+              displayIndex: 1,
+              command: entryAct.command,
+              argsBytes: [entryAct.argsBytes[0], entryAct.argsBytes[1], entryAct.argsBytes[2]],
+              args: entryAct.args >>> 0,
+              label: (buildOpcodeCatalog().get(entryAct.command) || {}).label || null,
+              fileOffset: (offset + 0) >>> 0,
+            });
+            if (Array.isArray(chain.actions)) {
+              for (let j = 0; j < chain.actions.length; j++) {
+                const a = chain.actions[j];
+                chainActions.push({
+                  index: j + 1,
+                  displayIndex: j + 2,
+                  command: a.command,
+                  argsBytes: [a.argsBytes[0], a.argsBytes[1], a.argsBytes[2]],
+                  args: a.args >>> 0,
+                  label: (buildOpcodeCatalog().get(a.command) || {}).label || null,
+                  fileOffset: (offset + (j + 1) * 4) >>> 0,
+                });
+              }
+            }
+          }
+          // Update opcode stats and usages
+          for (const act of chainActions) {
+            opcodeStats.set(act.command, (opcodeStats.get(act.command) || 0) + 1);
+            const k = '0x' + toHex(act.command, 2);
+            if (!opcodeUsages[k]) opcodeUsages[k] = [];
+            opcodeUsages[k].push({
+              itemIndex: `G${i + 1}`,
+              itemName: 'Global',
+              itemType: 0,
+              entryOffset: '0x' + toHex(offset, 8),
+              actionIndex: act.index,
+              argsHex: '0x' + toHex(act.args, 6),
+              argsDec: act.args,
+              fileOffset: '0x' + toHex(act.fileOffset, 8),
+              label: act.label || null,
+            });
+          }
+          commandFlows.push({ index: i, displayIndex: i + 1, offset, actions: chainActions, count: chainActions.length });
+
+          // Aggregate command stats
+          commandStatsAgg.totalFlows += 1;
+          commandStatsAgg.totalActions += chainActions.length;
+          commandStatsAgg.lengthCounts.set(chainActions.length, (commandStatsAgg.lengthCounts.get(chainActions.length) || 0) + 1);
+          if (chainActions.length > 0) {
+            const startOp = chainActions[0].command;
+            commandStatsAgg.startOpcodeCounts.set(startOp, (commandStatsAgg.startOpcodeCounts.get(startOp) || 0) + 1);
+          }
+          for (const a of chainActions) {
+            commandStatsAgg.opcodeCounts.set(a.command, (commandStatsAgg.opcodeCounts.get(a.command) || 0) + 1);
+            const opKey = '0x' + toHex(a.command, 2);
+            if (!commandStatsAgg.opcodeArgs.has(opKey)) commandStatsAgg.opcodeArgs.set(opKey, new Map());
+            const argsKey = '0x' + toHex(a.args, 6);
+            const m = commandStatsAgg.opcodeArgs.get(opKey);
+            m.set(argsKey, (m.get(argsKey) || 0) + 1);
+          }
+        }
+      } catch (e) {
+        // ignore parsing errors for flows
+      }
+
       // Serialize triggerStats
       const triggerStatsObj = {};
       for (const [tKey, ts] of triggerStats.entries()) {
@@ -416,7 +572,16 @@
           items: ts.items,
         };
       }
-      return { items, opcodeStats: Object.fromEntries(opcodeStats), bullets, monsters, monsterProjectileRefs, opcodeUsages, triggerStats: triggerStatsObj };
+      // Serialize command stats
+      const commandStats = {
+        opcodeCounts: Object.fromEntries(commandStatsAgg.opcodeCounts),
+        opcodeArgs: Object.fromEntries(Array.from(commandStatsAgg.opcodeArgs.entries()).map(([op, mp]) => [op, Object.fromEntries(mp)])),
+        lengthCounts: Object.fromEntries(commandStatsAgg.lengthCounts),
+        startOpcodeCounts: Object.fromEntries(commandStatsAgg.startOpcodeCounts),
+        totalFlows: commandStatsAgg.totalFlows,
+        totalActions: commandStatsAgg.totalActions,
+      };
+      return { items, opcodeStats: Object.fromEntries(opcodeStats), bullets, monsters, monsterProjectileRefs, opcodeUsages, triggerStats: triggerStatsObj, commandFlows, commandStats };
     }
 
     // Parse per-trigger command sections for an inventory item
@@ -627,6 +792,7 @@
         statusEl.textContent = 'Parsed successfully. Rendering tables...';
         render();
         populateTriggerSelect();
+        renderFlows();
         statusEl.textContent = 'Done.';
       } catch (e) {
         console.error(e);
@@ -722,11 +888,18 @@
         if (Number.isNaN(num)) return; key = '0x' + toHex(num, 2);
       }
       const rows = (analysis.opcodeUsages && analysis.opcodeUsages[key]) || [];
-      let itemLabels = {};
+      let itemLabels = {}; let flowLabels = {};
       try { itemLabels = JSON.parse(localStorage.getItem('dbase100ItemLabels') || '{}'); } catch {}
+      try { flowLabels = JSON.parse(localStorage.getItem('dbase100FlowLabels') || '{}'); } catch {}
       for (const u of rows) {
         const tr = document.createElement('tr');
-        const lbl = itemLabels[String(u.itemIndex)] || '';
+        let lbl = '';
+        if (u.itemName === 'Global' && typeof u.itemIndex === 'string' && /^G\d+$/.test(u.itemIndex)) {
+          const idxStr = u.itemIndex.slice(1);
+          lbl = flowLabels[idxStr] || '';
+        } else {
+          lbl = itemLabels[String(u.itemIndex)] || '';
+        }
         tr.innerHTML = `<td class="nowrap">${key}</td><td>${u.itemIndex}</td><td>${u.itemName}</td><td>${lbl}</td><td>0x${toHex(u.itemType,2)}</td><td>${u.argsHex} (${u.argsDec})</td><td>${u.entryOffset}</td><td>${u.fileOffset}</td>`;
         usageTableBody.appendChild(tr);
       }
@@ -765,6 +938,7 @@
       const opcodeLabels = getJsonStorage('dbase100OpcodeLabels');
       const itemLabels = getJsonStorage('dbase100ItemLabels');
       const triggerLabels = getJsonStorage('dbase100TriggerLabels');
+      const flowLabels = getJsonStorage('dbase100FlowLabels');
       // Build combined per-opcode object: { [opcodeHex]: { label, note } }
       const opcodes = {};
       const keys = new Set([...Object.keys(notes), ...Object.keys(opcodeLabels)]);
@@ -781,6 +955,7 @@
         opcodeLabels,
         itemLabels,
         triggerLabels,
+        flowLabels,
       };
       download('dbase100_annotations.json', JSON.stringify(payload, null, 2));
     });
@@ -814,6 +989,7 @@
           }
           if (data.itemLabels) localStorage.setItem('dbase100ItemLabels', JSON.stringify(data.itemLabels));
           if (data.triggerLabels) localStorage.setItem('dbase100TriggerLabels', JSON.stringify(data.triggerLabels));
+          if (data.flowLabels) localStorage.setItem('dbase100FlowLabels', JSON.stringify(data.flowLabels));
           statusEl.textContent = 'Annotations imported.';
         }
         populateTriggerSelect();
@@ -872,6 +1048,128 @@
         `;
       }).join('');
       el.innerHTML = header + triggerBlocks;
+    }
+
+    // Render global command flows
+    function renderFlows() {
+      const tbody = document.querySelector('#flowsTable tbody');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+      if (!analysis || !analysis.commandFlows) return;
+      const q = (document.getElementById('flowSearch').value || '').trim().toLowerCase();
+      let flows = analysis.commandFlows;
+      if (q) {
+        flows = flows.filter(f => {
+          if (String(f.displayIndex).includes(q)) return true;
+          const hexIndex = '0x' + toHex(f.displayIndex, 4);
+          if (hexIndex.toLowerCase().includes(q)) return true;
+          return f.actions.some(a => {
+            const opHex = '0x' + toHex(a.command, 2);
+            return opHex.toLowerCase().includes(q);
+          });
+        });
+      }
+      let opcodeLabels = {}; try { opcodeLabels = JSON.parse(localStorage.getItem('dbase100OpcodeLabels') || '{}'); } catch {}
+      let flowLabels = {}; try { flowLabels = JSON.parse(localStorage.getItem('dbase100FlowLabels') || '{}'); } catch {}
+      for (const f of flows) {
+        const tr = document.createElement('tr');
+        const acts = f.actions.map(a => {
+          const opHex = '0x' + toHex(a.command, 2);
+          const lbl = opcodeLabels[opHex] || (buildOpcodeCatalog().get(a.command)?.label || '');
+          return `${toHex(a.args,6)}:${toHex(a.command,2)}${lbl? '['+lbl+']':''}`;
+        }).join(' ');
+        const fLbl = flowLabels[String(f.displayIndex)] || '';
+        tr.innerHTML = `<td>${f.displayIndex} <span class=\"pill\">0x${toHex(f.displayIndex,4)}</span></td><td><input data-flow-label=\"${f.displayIndex}\" value=\"${fLbl}\" placeholder=\"Label\"/></td><td>0x${toHex(f.offset,8)}</td><td style=\"font-family:monospace\">${acts}</td>`;
+        tr.addEventListener('click', () => renderFlowInspector(f));
+        tbody.appendChild(tr);
+      }
+      // Wire table label editors
+      tbody.querySelectorAll('input[data-flow-label]').forEach(el => {
+        el.addEventListener('change', () => {
+          try {
+            const labels = JSON.parse(localStorage.getItem('dbase100FlowLabels') || '{}');
+            labels[el.dataset.flowLabel] = el.value || '';
+            localStorage.setItem('dbase100FlowLabels', JSON.stringify(labels));
+          } catch {}
+        });
+      });
+    }
+
+    document.getElementById('refreshFlows').addEventListener('click', renderFlows);
+    document.getElementById('flowSearch').addEventListener('input', renderFlows);
+    // Render flow stats after analyze
+    (function(){ try { renderFlowStats(); } catch {} })();
+
+    // Save flow label
+    document.getElementById('saveFlowLabel').addEventListener('click', () => {
+      const target = document.getElementById('flowLabelTarget').textContent || '';
+      const match = target.match(/Selected flow: (\d+)/);
+      if (!match) return;
+      const index = match[1];
+      const input = document.getElementById('flowLabel');
+      try {
+        const labels = JSON.parse(localStorage.getItem('dbase100FlowLabels') || '{}');
+        labels[String(index)] = input.value || '';
+        localStorage.setItem('dbase100FlowLabels', JSON.stringify(labels));
+        // refresh inspector if same flow is open
+        if (document.getElementById('flowInspector').innerHTML) {
+          const flow = (analysis && analysis.commandFlows) ? analysis.commandFlows.find(f => String(f.displayIndex) === String(index)) : null;
+          if (flow) renderFlowInspector(flow);
+        }
+      } catch {}
+    });
+
+    function renderFlowInspector(flow) {
+      const container = document.getElementById('flowInspector');
+      if (!container) return;
+      let opcodeLabels = {}; try { opcodeLabels = JSON.parse(localStorage.getItem('dbase100OpcodeLabels') || '{}'); } catch {}
+      let flowLabels = {}; try { flowLabels = JSON.parse(localStorage.getItem('dbase100FlowLabels') || '{}'); } catch {}
+      const fLbl = flowLabels[String(flow.displayIndex)] || '';
+      document.getElementById('flowLabelTarget').textContent = `Selected flow: ${flow.displayIndex} (0x${toHex(flow.displayIndex,4)})`;
+      const header = `<div class=\"flex\"><div><strong>Index:</strong> ${flow.displayIndex} <span class=\"pill\">0x${toHex(flow.displayIndex,4)}</span></div><div><strong>Label:</strong> ${fLbl || '<span class=\\"muted\\">(none)</span>'}</div><div><strong>Offset:</strong> 0x${toHex(flow.offset,8)}</div><div><strong>Actions:</strong> ${flow.count}</div></div>`;
+      const rows = flow.actions.map(a => {
+        const opHex = '0x' + toHex(a.command, 2);
+        const lbl = opcodeLabels[opHex] || (buildOpcodeCatalog().get(a.command)?.label || '');
+        return `<tr><td>${a.displayIndex ?? (a.index+1)}</td><td>${opHex}${lbl? ' ['+lbl+']':''}</td><td>0x${toHex(a.args,6)} (${a.args})</td><td>0x${toHex(a.fileOffset,8)}</td></tr>`;
+      }).join('');
+      container.innerHTML = header + `<div class=\"list\" style=\"margin-top:8px\"><table><thead><tr><th>#</th><th>Opcode</th><th>Args</th><th>Offset</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    }
+
+    function renderFlowStats() {
+      if (!analysis || !analysis.commandStats) return;
+      const cs = analysis.commandStats;
+      const summary = document.getElementById('flowStatsSummary');
+      summary.textContent = `Flows: ${cs.totalFlows} • Actions: ${cs.totalActions}`;
+      // Length table
+      const lenBody = document.getElementById('flowLengthTable');
+      lenBody.innerHTML = '';
+      for (const [len, count] of Object.entries(cs.lengthCounts).sort((a,b)=>Number(a[0])-Number(b[0]))) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${len}</td><td>${count}</td>`;
+        lenBody.appendChild(tr);
+      }
+      // Start opcode table
+      const startBody = document.getElementById('flowStartTable');
+      startBody.innerHTML = '';
+      for (const [opDecStr, count] of Object.entries(cs.startOpcodeCounts).sort((a,b)=>Number(a[0])-Number(b[0]))) {
+        const opDec = Number(opDecStr);
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>0x${toHex(opDec,2)} (${opDec})</td><td>${count}</td>`;
+        startBody.appendChild(tr);
+      }
+      // Opcode table
+      const opBody = document.getElementById('flowOpcodeTable');
+      opBody.innerHTML = '';
+      const entries = Object.entries(cs.opcodeCounts).sort((a,b)=>Number(a[0])-Number(b[0]));
+      for (const [opDecStr, count] of entries) {
+        const opDec = Number(opDecStr);
+        const opHex = '0x' + toHex(opDec, 2);
+        const argsMap = cs.opcodeArgs[opHex] || {};
+        const topArgs = Object.entries(argsMap).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([a,c])=>`${a}(${c})`).join(' ');
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${opHex} (${opDec})</td><td>${count}</td><td style=\"font-family:monospace\">${topArgs}</td>`;
+        opBody.appendChild(tr);
+      }
     }
     </script>
 </body>
