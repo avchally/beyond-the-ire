@@ -21,7 +21,9 @@
         input, select, button, textarea { background: #444; color: #fff; border: 1px solid #666; border-radius: 4px; padding: 6px 8px; box-sizing: border-box; max-width: 100%; }
         input[data-label] { width: 100%; }
         button { cursor: pointer; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .panel h3 { display: flex; align-items: center; justify-content: space-between; margin: 0 0 8px 0; }
+        .panel .panel-toggle { padding: 2px 8px; background: #444; color: #fff; border: 1px solid #666; border-radius: 4px; font-size: 12px; }
+        .grid { display: grid; /* grid-template-columns: 1fr 1fr; */ gap: 16px; }
         .list { max-height: 70vh; overflow-y: auto; overflow-x: hidden; }
         .flex { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
         .small { font-size: 12px; color: #ccc; }
@@ -93,134 +95,159 @@
     <div class="container">
         <h1>DBASE100 Analyzer</h1>
 
-        <div class="panel">
-            <div class="row">
-                <div class="col">
-                    <div id="dropZone100" class="drop-zone">Drop DBASE100.DAT here or click to select<input id="file100" type="file" accept=".DAT,.dat" style="display:none"></div>
+        <div class="panel" id="panel-files">
+            <h3>
+                File Loader
+                <button class="panel-toggle" data-target="panel-files-contents">Collapse</button>
+            </h3>
+            <div id="panel-files-contents">
+                <div class="row" id="panel-files-body">
+                    <div class="col">
+                        <div id="dropZone100" class="drop-zone">Drop DBASE100.DAT here or click to select<input id="file100" type="file" accept=".DAT,.dat" style="display:none"></div>
+                    </div>
+                    <div class="col">
+                        <div id="dropZone400" class="drop-zone">Drop DBASE400.DAT here or click to select<input id="file400" type="file" accept=".DAT,.dat" style="display:none"></div>
+                    </div>
                 </div>
-                <div class="col">
-                    <div id="dropZone400" class="drop-zone">Drop DBASE400.DAT here or click to select<input id="file400" type="file" accept=".DAT,.dat" style="display:none"></div>
+                <div class="flex" style="margin-top:10px" id="panel-files-footer">
+                    <button id="analyzeBtn">Analyze</button>
+                    <span id="loadStatus" class="small muted">Waiting for files...</span>
+                    <span id="fileInfo" class="small"></span>
                 </div>
-            </div>
-            <div class="flex" style="margin-top:10px">
-                <button id="analyzeBtn">Analyze</button>
-                <span id="loadStatus" class="small muted">Waiting for files...</span>
-                <span id="fileInfo" class="small"></span>
             </div>
         </div>
 
         <div class="grid">
-            <div class="panel">
-                <div class="flex" style="justify-content: space-between;">
-                    <div class="flex">
-                        <input id="searchBox" placeholder="Filter by name/opcode (e.g., Monster or 0x28)">
-                        <select id="typeFilter">
-                            <option value="">All types</option>
-                        </select>
-                        <button id="exportCsv">Export Inventory CSV</button>
-                        <button id="exportJson">Export Inventory JSON</button>
-                        <button id="exportItemLabels">Export Item Labels</button>
-                        <input id="importItemLabelsFile" type="file" accept="application/json" style="display:none">
-                        <button id="importItemLabels">Import Item Labels</button>
+            <div class="panel" id="panel-items">
+                <h3>
+                    Inventory Items
+                    <button class="panel-toggle" data-target="panel-items-contents">Collapse</button>
+                </h3>
+                <div id="panel-items-contents">
+                    <div class="flex" style="justify-content: space-between;" id="panel-items-body">
+                        <div class="flex">
+                            <input id="searchBox" placeholder="Filter by name/opcode (e.g., Monster or 0x28)">
+                            <select id="typeFilter">
+                                <option value="">All types</option>
+                            </select>
+                            <button id="exportCsv">Export Inventory CSV</button>
+                            <button id="exportJson">Export Inventory JSON</button>
+                            <button id="exportItemLabels">Export Item Labels</button>
+                            <input id="importItemLabelsFile" type="file" accept="application/json" style="display:none">
+                            <button id="importItemLabels">Import Item Labels</button>
+                        </div>
+                        <div class="flex small">
+                            <span id="totals"></span>
+                        </div>
                     </div>
-                    <div class="flex small">
-                        <span id="totals"></span>
+                    <div class="list" id="panel-items-list">
+                        <table id="itemsTable">
+                            <thead>
+                                <tr>
+                                    <th class="nowrap">Index</th>
+                                    <th>Name</th>
+                                    <th class="nowrap">ItemType</th>
+                                    <th class="nowrap">Entry Offset</th>
+                                    <th>Details</th>
+                                    <th>Label</th>
+                                    <th>Actions</th>
+                                    <th>Inspect</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
                     </div>
-                </div>
-                <div class="list">
-                    <table id="itemsTable">
-                        <thead>
-                            <tr>
-                                <th class="nowrap">Index</th>
-                                <th>Name</th>
-                                <th class="nowrap">ItemType</th>
-                                <th class="nowrap">Entry Offset</th>
-                                <th>Details</th>
-                                <th>Label</th>
-                                <th>Actions</th>
-                                <th>Inspect</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
                 </div>
             </div>
 
-            <div class="panel">
-                <h3 style="margin-top:0">Opcode Stats</h3>
+            <div class="panel" id="panel-opcodes">
+                <h3>
+                    Opcode Stats
+                    <button class="panel-toggle" data-target="panel-opcodes-contents">Collapse</button>
+                </h3>
+                <div id="panel-opcodes-contents">
+                    <div class="flex" style="margin-bottom:8px" id="panel-opcodes-body">
+                        <input id="opcodeSearch" placeholder="Search opcode (e.g., 0x28 or 40)">
+                        <button id="showUsage">Show Usage</button>
+                    </div>
+                    <div class="flex small" style="margin-bottom:6px">
+                        <span id="opcodeCoverageText" class="muted">Coverage: —</span>
+                        <div class="progress"><div id="opcodeCoverageBar" class="progress-inner"></div></div>
+                    </div>
+                    <div class="list" id="panel-opcodes-list">
+                        <table id="opTable">
+                            <thead>
+                                <tr><th>Opcode</th><th>Dec</th><th>Count</th><th>Label</th><th>Note</th></tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    <div class="list" style="margin-top:10px" id="panel-usage-list">
+                        <table id="usageTable">
+                            <thead>
+                                <tr><th>Opcode</th><th>Item Index</th><th>Name</th><th>Label</th><th>Type</th><th>Args</th><th>Item Offset</th><th>Action Offset</th></tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    <div class="flex" style="margin-top:10px">
+                        <button id="exportNotes">Export Notes</button>
+                        <input id="importNotesFile" type="file" accept="application/json" style="display:none">
+                        <button id="importNotes">Import Notes</button>
+                        <button id="clearNotes">Clear Notes</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel" id="panel-triggers">
+            <h3>
+                Trigger Analysis
+                <button class="panel-toggle" data-target="panel-triggers-contents">Collapse</button>
+            </h3>
+            <div id="panel-triggers-contents">
+                <div class="flex" style="margin-bottom:8px" id="panel-triggers-body">
+                    <select id="triggerSelect">
+                        <option value="">Select trigger</option>
+                    </select>
+                    <button id="showTrigger">Analyze Trigger</button>
+                    <button id="exportTriggerStats">Export Trigger Stats</button>
+                </div>
                 <div class="flex" style="margin-bottom:8px">
-                    <input id="opcodeSearch" placeholder="Search opcode (e.g., 0x28 or 40)">
-                    <button id="showUsage">Show Usage</button>
+                    <input id="triggerLabel" placeholder="Trigger label (e.g., Inspect)"/>
+                    <button id="saveTriggerLabel">Save Label</button>
                 </div>
-                <div class="flex small" style="margin-bottom:6px">
-                    <span id="opcodeCoverageText" class="muted">Coverage: —</span>
-                    <div class="progress"><div id="opcodeCoverageBar" class="progress-inner"></div></div>
-                </div>
-                <div class="list">
-                    <table id="opTable">
-                        <thead>
-                            <tr><th>Opcode</th><th>Dec</th><th>Count</th><th>Label</th><th>Note</th></tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
-                <div class="list" style="margin-top:10px">
-                    <table id="usageTable">
-                        <thead>
-                            <tr><th>Opcode</th><th>Item Index</th><th>Name</th><th>Label</th><th>Type</th><th>Args</th><th>Item Offset</th><th>Action Offset</th></tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
-                <div class="flex" style="margin-top:10px">
-                    <button id="exportNotes">Export Notes</button>
-                    <input id="importNotesFile" type="file" accept="application/json" style="display:none">
-                    <button id="importNotes">Import Notes</button>
-                    <button id="clearNotes">Clear Notes</button>
-                </div>
-            </div>
-        </div>
-
-        <div class="panel">
-            <h3 style="margin-top:0">Trigger Analysis</h3>
-            <div class="flex" style="margin-bottom:8px">
-                <select id="triggerSelect">
-                    <option value="">Select trigger</option>
-                </select>
-                <button id="showTrigger">Analyze Trigger</button>
-                <button id="exportTriggerStats">Export Trigger Stats</button>
-            </div>
-            <div class="flex" style="margin-bottom:8px">
-                <input id="triggerLabel" placeholder="Trigger label (e.g., Inspect)"/>
-                <button id="saveTriggerLabel">Save Label</button>
-            </div>
-            <div id="triggerSummary" class="small muted">Select a trigger to see stats.</div>
-            <div class="row" style="margin-top:10px">
-                <div class="col">
-                    <div class="list">
-                        <table>
-                            <thead>
-                                <tr><th>Opcode</th><th>Count</th><th>Unique Args</th><th>Top Args</th></tr>
-                            </thead>
-                            <tbody id="triggerOpcodes"></tbody>
-                        </table>
+                <div id="triggerSummary" class="small muted">Select a trigger to see stats.</div>
+                <div class="row" style="margin-top:10px">
+                    <div class="col">
+                        <div class="list" id="panel-triggers-opcodes">
+                            <table>
+                                <thead>
+                                    <tr><th>Opcode</th><th>Count</th><th>Unique Args</th><th>Top Args</th></tr>
+                                </thead>
+                                <tbody id="triggerOpcodes"></tbody>
+                            </table>
+                        </div>
                     </div>
-                </div>
-                <div class="col">
-                    <div class="list">
-                        <table>
-                            <thead>
-                                <tr><th>Item</th><th>Label</th><th>Type</th><th>Section Offset</th><th>#Actions</th></tr>
-                            </thead>
-                            <tbody id="triggerItems"></tbody>
-                        </table>
+                    <div class="col">
+                        <div class="list" id="panel-triggers-items">
+                            <table>
+                                <thead>
+                                    <tr><th>Item</th><th>Label</th><th>Type</th><th>Section Offset</th><th>#Actions</th></tr>
+                                </thead>
+                                <tbody id="triggerItems"></tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="panel">
-            <h3 style="margin-top:0">Item Inspector</h3>
+        <div class="panel" id="panel-inspector">
+            <h3>
+                Item Inspector
+                <button class="panel-toggle" data-target="itemInspector">Collapse</button>
+            </h3>
             <div id="itemInspector">
                 <div class="muted small">Select an item from the inventory table and click Open.</div>
             </div>
@@ -794,6 +821,19 @@
       } catch(err) { statusEl.textContent = 'Failed to import annotations: ' + err.message; }
     });
     document.getElementById('clearNotes').addEventListener('click', () => { setNotes({}); render(); statusEl.textContent = 'Notes cleared.'; });
+
+    // Collapsible panels
+    document.querySelectorAll('.panel-toggle').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const targetId = btn.getAttribute('data-target');
+        if (!targetId) return;
+        const target = document.getElementById(targetId);
+        if (!target) return;
+        const isHidden = target.style.display === 'none';
+        target.style.display = isHidden ? '' : 'none';
+        btn.textContent = isHidden ? 'Collapse' : 'Expand';
+      });
+    });
 
     function renderItemInspector(it) {
       const el = document.getElementById('itemInspector');
