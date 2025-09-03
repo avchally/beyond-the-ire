@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "exportedAt": "2025-09-03T14:14:37.235Z",
+  "exportedAt": "2025-09-03T18:33:44.029Z",
   "opcodes": {
     "0x16": {
       "label": "TravelSpeed",
@@ -27,8 +27,8 @@
       "note": "DBASE400 offset"
     },
     "0x02": {
-      "label": "If has item, continue",
-      "note": "Item index"
+      "label": "If item acount above, continue",
+      "note": "first two bytes represent the item index to check. the third byte represents the number to do a \"greater than\" comparison against."
     },
     "0x09": {
       "label": "Start choice sequence",
@@ -154,8 +154,64 @@
       "label": "ChangeName",
       "note": "used with the 0x02 trigger to change the name of an item (usually with some flag; if so call 0x01 AFTER this one). the value is the index (must confirm) of the string/interface"
     },
+    "0x07": {
+      "label": "Play Video",
+      "note": "Cutscene index from DBASE100"
+    },
+    "0x0b": {
+      "label": "Start random",
+      "note": "FF FF FF"
+    },
+    "0x0c": {
+      "label": "End random",
+      "note": "FF FF FF"
+    },
+    "0x0e": {
+      "label": "DisplayTheEnd",
+      "note": "displays a texture onscreen (DBASE300 Offset / 8). But is only used to display the \"The End\" screen"
+    },
+    "0x1a": {
+      "label": "ChangeMusic",
+      "note": "DBASE400 Offset / 8"
+    },
+    "0x23": {
+      "label": "MapCommandIndexCallback",
+      "note": "Performs a script from the current .RAW map file. value is the command index"
+    },
+    "0x36": {
+      "label": "MapCommandIDCallback",
+      "note": "Performs a script from the current .RAW map file. value is the command ID"
+    },
+    "0x91": {
+      "label": "RemoveItem",
+      "note": "removes item from inventory. value is item index"
+    },
+    "0x9c": {
+      "label": "ExitCommand",
+      "note": "always FF FF FF; used to end a command flow's execution"
+    },
+    "0x35": {
+      "label": "Dbase100CommandCallback",
+      "note": "performs a dbase100 command corresponding to its index"
+    },
+    "0x34": {
+      "label": "CombineWithItem",
+      "note": "set during the OnUse trigger (0x0b) and makes the current item combinable with another item whose index is the argument required for this command. run 0xB4 after this to set the item that the two will be replaced with"
+    },
+    "0xb4": {
+      "label": "SetCombinedItem",
+      "note": "used after command 0x34 to determine the final item when two items are combined. value is the item index of the final result item. When no 0x34 command is used, the item can be combined with itself (ie, used)."
+    },
+    "0x82": {
+      "label": "If item count below or equal, continue",
+      "note": "checks if the count of an item id in inventory is below a certain number and continues if so. first two bytes represent the item index to check. the third byte represents the number to do a \"less than\" comparison against."
+    },
+    "0x83": {
+      "label": "If item count equal, continue",
+      "note": "checks if the count of an item id in inventory is equal to a certain amount. first two bytes represent the item index to check. the third byte represents the amount to compare with"
+    },
     "0x04": {
-      "label": "Set flag",
+      "label": "SetFlag",
       "note": ""
     },
     "0x0d": {
@@ -164,10 +220,6 @@
     },
     "0x81": {
       "label": "If not flag set, continue",
-      "note": ""
-    },
-    "0x82": {
-      "label": "If not item has, continue",
       "note": ""
     },
     "0x8d": {
@@ -185,6 +237,10 @@
     "0x24": {
       "label": "SetMonsterMoveSpeed",
       "note": ""
+    },
+    "0x84": {
+      "label": "UnsetFlag",
+      "note": ""
     }
   },
   "notes": {
@@ -194,7 +250,7 @@
     "0x30": "Flashes the environment. First darkness then brightness. Value is the intensity",
     "0x15": "The max damage caused (anywhere from 0.5x-1.0x)",
     "0x08": "DBASE400 offset",
-    "0x02": "Item index",
+    "0x02": "first two bytes represent the item index to check. the third byte represents the number to do a \"greater than\" comparison against.",
     "0x09": "FF FF FF",
     "0x0a": "FF FF FF",
     "0x11": "Item index",
@@ -225,7 +281,21 @@
     "0x25": "Slightly influencing a monster's movement/pathing",
     "0x26": "Initializes max health of a monster or heals by value",
     "0x0f": "used with the 0x01 trigger code to set up discussion topics when examining an item. value is the index (must confirm) to a string interface which will be displayed when the \"i\" button is pressed in inventory. when the topic is pressed, the contained command chain is run",
-    "0x10": "used with the 0x02 trigger to change the name of an item (usually with some flag; if so call 0x01 AFTER this one). the value is the index (must confirm) of the string/interface"
+    "0x10": "used with the 0x02 trigger to change the name of an item (usually with some flag; if so call 0x01 AFTER this one). the value is the index (must confirm) of the string/interface",
+    "0x07": "Cutscene index from DBASE100",
+    "0x0b": "FF FF FF",
+    "0x0c": "FF FF FF",
+    "0x0e": "displays a texture onscreen (DBASE300 Offset / 8). But is only used to display the \"The End\" screen",
+    "0x1a": "DBASE400 Offset / 8",
+    "0x23": "Performs a script from the current .RAW map file. value is the command index",
+    "0x36": "Performs a script from the current .RAW map file. value is the command ID",
+    "0x91": "removes item from inventory. value is item index",
+    "0x9c": "always FF FF FF; used to end a command flow's execution",
+    "0x35": "performs a dbase100 command corresponding to its index",
+    "0x34": "set during the OnUse trigger (0x0b) and makes the current item combinable with another item whose index is the argument required for this command. run 0xB4 after this to set the item that the two will be replaced with",
+    "0xb4": "used after command 0x34 to determine the final item when two items are combined. value is the item index of the final result item. When no 0x34 command is used, the item can be combined with itself (ie, used).",
+    "0x82": "checks if the count of an item id in inventory is below a certain number and continues if so. first two bytes represent the item index to check. the third byte represents the number to do a \"less than\" comparison against.",
+    "0x83": "checks if the count of an item id in inventory is equal to a certain amount. first two bytes represent the item index to check. the third byte represents the amount to compare with"
   },
   "opcodeLabels": {
     "0x15": "MaxDamage",
@@ -236,8 +306,8 @@
     "0x28": "SetMonsterBullet",
     "0x05": "Play Audio Dialog",
     "0x00": "InventoryDocumentImage",
-    "0x02": "If has item, continue",
-    "0x04": "Set flag",
+    "0x02": "If item acount above, continue",
+    "0x04": "SetFlag",
     "0x08": "Choice string",
     "0x09": "Start choice sequence",
     "0x0a": "End choice sequence",
@@ -246,7 +316,7 @@
     "0x1c": "?",
     "0x1d": "Jump to command",
     "0x81": "If not flag set, continue",
-    "0x82": "If not item has, continue",
+    "0x82": "If item count below or equal, continue",
     "0x8d": "If not flag set, next command",
     "0x33": "WeaponIconUI",
     "0x2d": "?",
@@ -273,7 +343,21 @@
     "0x25": "MonsterPathingFlag?",
     "0x26": "SetHealthOrHeal",
     "0x0f": "SetInformationTopic",
-    "0x10": "ChangeName"
+    "0x10": "ChangeName",
+    "0x07": "Play Video",
+    "0x0b": "Start random",
+    "0x0c": "End random",
+    "0x0e": "DisplayTheEnd",
+    "0x1a": "ChangeMusic",
+    "0x23": "MapCommandIndexCallback",
+    "0x36": "MapCommandIDCallback",
+    "0x84": "UnsetFlag",
+    "0x91": "RemoveItem",
+    "0x9c": "ExitCommand",
+    "0x35": "Dbase100CommandCallback",
+    "0x34": "CombineWithItem",
+    "0xb4": "SetCombinedItem",
+    "0x83": "If item count equal, continue"
   },
   "itemLabels": {
     "29": "Slanderer",
@@ -341,5 +425,28 @@
     "0x0a": "AsMonster",
     "0x02": "OnHover",
     "0x01": "OnInformation"
+  },
+  "flowLabels": {
+    "1": "Intro Sequence",
+    "3": "Chapter 1 (start game)",
+    "4": "? Play death noise",
+    "5": "Play Intro (vid only)",
+    "6": "Play Making Of",
+    "7": "Play Credits",
+    "223": "Chullum Alt Dialog Choice",
+    "235": "Chullum Ashdar Statue Lower",
+    "317": "Unused telephone inspect",
+    "532": "Meet Belial",
+    "539": "On Mask Use",
+    "551": "Combine Spirit Ring",
+    "600": "Tower lost w/ Raphael",
+    "613": "Final confrontation (Chapter 19 + 20)",
+    "614": "The End",
+    "675": "Play random Adam reaction 1",
+    "676": "Play random Adam reaction 2",
+    "687": "Portal Verse Video",
+    "689": "",
+    "691": "Chapter 9",
+    "692": "\"Oh God\""
   }
 }
