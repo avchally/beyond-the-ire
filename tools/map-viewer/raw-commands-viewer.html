@@ -1,0 +1,1123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAW Commands Analyzer</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #222; color: #eee; }
+        .container { display: flex; flex-direction: column; max-width: 95vw; margin: 0 auto; min-height: 95vh; }
+        h1 { text-align: center; color: #f8bb3d; }
+        .panel { background: #333; border-radius: 6px; padding: 16px; margin-bottom: 16px; }
+        .row { display: flex; gap: 16px; }
+        .col { flex: 1; }
+        .drop-zone { border: 2px dashed #555; border-radius: 5px; padding: 18px; text-align: center; background: #2a2a2a; cursor: pointer; }
+        .drop-zone.dragover { border-color: #f8bb3d; background: #333; }
+        .status { font-family: monospace; background: #444; padding: 10px; border-radius: 4px; max-height: 140px; overflow: auto; white-space: pre-line; }
+        table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        th, td { padding: 6px 8px; border-bottom: 1px solid #444; }
+        th { background: #3a3a3a; position: sticky; top: 0; }
+        .pill { display: inline-block; padding: 2px 6px; border-radius: 10px; background: #555; font-size: 12px; }
+        input, select, button, textarea { background: #444; color: #fff; border: 1px solid #666; border-radius: 4px; padding: 6px 8px; box-sizing: border-box; max-width: 100%; }
+        button { cursor: pointer; }
+        .panel h3 { display: flex; align-items: center; justify-content: space-between; margin: 0 0 8px 0; }
+        .panel .panel-toggle { padding: 2px 8px; background: #444; color: #fff; border: 1px solid #666; border-radius: 4px; font-size: 12px; }
+        .grid { display: grid; gap: 16px; }
+        .list { max-height: 70vh; overflow-y: auto; overflow-x: hidden; }
+        .flex { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .small { font-size: 12px; color: #ccc; }
+        .muted { color: #aaa; }
+        .nowrap { white-space: nowrap; }
+        .progress { background: #444; border-radius: 4px; height: 8px; width: 220px; overflow: hidden; display: inline-block; vertical-align: middle; margin-left: 8px; }
+        .progress-inner { background: #4caf50; height: 100%; width: 0%; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>RAW Commands Analyzer</h1>
+
+        <div class="panel" id="panel-files">
+            <h3>
+                File Loader
+                <button class="panel-toggle" data-target="panel-files-contents">Collapse</button>
+            </h3>
+            <div id="panel-files-contents">
+                <div class="row" id="panel-files-body">
+                    <div class="col">
+                        <div id="dropZoneRaw" class="drop-zone">Drop .RAW/.RAWR here or click to select<input id="fileRaw" type="file" accept=".RAW,.raw,.RAWR,.rawr" style="display:none"></div>
+                    </div>
+                    <div class="col">
+                        <div id="dropZoneFolder" class="drop-zone">Click to select a folder of .RAW files<input id="fileRawFolder" type="file" webkitdirectory directory multiple style="display:none"></div>
+                    </div>
+                </div>
+                <div class="flex" style="margin-top:10px" id="panel-files-footer">
+                    <button id="analyzeBtn">Analyze</button>
+                    <span id="loadStatus" class="small muted">Waiting for file...</span>
+                    <span id="fileInfo" class="small"></span>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel" id="panel-header">
+            <h3>
+                Header Summary
+                <button class="panel-toggle" data-target="panel-header-contents">Collapse</button>
+            </h3>
+            <div id="panel-header-contents">
+                <div id="headerSummary" class="small muted">Load a RAW file to view header info.</div>
+            </div>
+        </div>
+
+        <div class="grid">
+            <div class="panel" id="panel-categories">
+                <h3>
+                    Entry Categories
+                    <button class="panel-toggle" data-target="panel-categories-contents">Collapse</button>
+                </h3>
+                <div id="panel-categories-contents">
+                    <div class="flex" style="margin-bottom:8px">
+                        <select id="categorySelect"><option value="">Select category</option></select>
+                        <input id="categoryLabel" placeholder="Category label (e.g., Floor Trigger)"/>
+                        <button id="saveCategoryLabel">Save Label</button>
+                    </div>
+                    <div class="list">
+                        <table>
+                            <thead><tr><th>#</th><th>Offset</th><th>Count</th><th>Files</th><th>Associated Command</th><th>Label</th></tr></thead>
+                            <tbody id="categoriesTable"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel" id="panel-opcodes">
+                <h3>
+                    Opcode Stats
+                    <button class="panel-toggle" data-target="panel-opcodes-contents">Collapse</button>
+                </h3>
+                <div id="panel-opcodes-contents">
+                    <div class="flex" style="margin-bottom:8px">
+                        <input id="opcodeSearch" placeholder="Search opcode (e.g., 0x29 or 41)">
+                        <button id="showUsage">Show Usage</button>
+                        <select id="scopeSelect"><option value="ALL">All files</option></select>
+                        <span id="opcodeCoverageText" class="muted small">Coverage: —</span>
+                        <div class="progress"><div id="opcodeCoverageBar" class="progress-inner"></div></div>
+                    </div>
+                    <div class="list">
+                        <table id="opTable">
+                            <thead>
+                                <tr><th>Opcode</th><th>Dec</th><th>Count</th><th>Label</th><th>Note</th></tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    <div class="list" style="margin-top:10px">
+                        <table id="usageTable">
+                            <thead>
+                                <tr><th>Opcode</th><th>File</th><th>Chain</th><th>Category</th><th>Label</th><th>Args</th><th>CmdIdx</th><th>CmdOffset</th></tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    <div class="flex" style="margin-top:10px">
+                        <button id="exportNotes">Export Notes</button>
+                        <input id="importNotesFile" type="file" accept="application/json" style="display:none">
+                        <button id="importNotes">Import Notes</button>
+                        <button id="clearNotes">Clear Notes</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel" id="panel-opcode-inspector">
+            <h3>
+                Opcode Inspector
+                <button class="panel-toggle" data-target="panel-opcode-inspector-contents">Collapse</button>
+            </h3>
+            <div id="panel-opcode-inspector-contents">
+                <div class="flex" style="margin-bottom:8px">
+                    <select id="opcodeSelect"><option value="">Select opcode</option></select>
+                    <input id="opcodeValueSearch" placeholder="Filter values (hex/dec)"/>
+                    <button id="refreshOpcodeInspector">Refresh</button>
+                </div>
+                <div id="opcodeSummary" class="small muted">Select an opcode to inspect its arguments.</div>
+                <div class="list" id="opcodeArgsContainer" style="margin-top:10px"></div>
+                <div class="list" id="opcodeArgRefsContainer" style="margin-top:10px"></div>
+            </div>
+        </div>
+
+        <div class="panel" id="panel-chains">
+            <h3>
+                Entry Command Chains
+                <button class="panel-toggle" data-target="panel-chains-contents">Collapse</button>
+            </h3>
+            <div id="panel-chains-contents">
+                <div class="flex" style="margin-bottom:8px">
+                    <input id="chainSearch" placeholder="Filter by opcode (e.g., 0x13) or chain #">
+                    <button id="refreshChains">Refresh</button>
+                </div>
+                <div class="list">
+                    <table id="chainsTable">
+                        <thead>
+                            <tr><th>#</th><th>Label</th><th>Category</th><th>Start Offset</th><th>Length</th><th>Entry</th></tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel" id="panel-inspector">
+            <h3>
+                Chain Inspector
+                <button class="panel-toggle" data-target="panel-inspector-contents">Collapse</button>
+            </h3>
+            <div id="panel-inspector-contents">
+                <div id="chainInspector" class="small muted">Select a chain.</div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h3 style="margin-top:0">Status</h3>
+            <div id="status" class="status">Idle.</div>
+        </div>
+    </div>
+
+    <script>
+    // Utilities
+    const statusEl = document.getElementById('status');
+    const loadStatus = document.getElementById('loadStatus');
+    const fileInfo = document.getElementById('fileInfo');
+    const categoriesTableBody = document.querySelector('#categoriesTable');
+    const opTableBody = document.querySelector('#opTable tbody');
+    const usageTableBody = document.querySelector('#usageTable tbody');
+    const chainsTableBody = document.querySelector('#chainsTable tbody');
+    const opcodeSearch = document.getElementById('opcodeSearch');
+    const scopeSelect = document.getElementById('scopeSelect');
+    const opcodeSelect = document.getElementById('opcodeSelect');
+
+    let rawBuffer = null;
+    let analysis = null;
+    let multi = { files: [], analyses: [], totals: null };
+    let selectedOpcodeDec = null;
+
+    function toHex(num, width = 2) { return Number(num >>> 0).toString(16).padStart(width, '0'); }
+    function readAscii(view, offset, len) {
+        let s = '';
+        for (let i = 0; i < len; i++) s += String.fromCharCode(view.getUint8(offset + i));
+        return s;
+    }
+    function getNotes() { try { return JSON.parse(localStorage.getItem('rawOpcodeNotes') || '{}'); } catch { return {}; } }
+    function setNotes(notes) { localStorage.setItem('rawOpcodeNotes', JSON.stringify(notes)); }
+    function getJsonStorage(key) { try { return JSON.parse(localStorage.getItem(key) || '{}'); } catch { return {}; } }
+
+    // Category mapping from RAW.md
+    function buildCategoryCatalog() {
+        return new Map([
+            [1, { offset: 0x00, base: ['0x08','0x02'], label: 'Entry: 0x08 & 0x02' }],
+            [2, { offset: 0x04, base: [], label: 'Unused' }],
+            [3, { offset: 0x08, base: ['0x03'], label: 'Entry: 0x03' }],
+            [4, { offset: 0x0C, base: ['0x13'], label: 'Entry: 0x13 (Floor Trigger)' }],
+            [5, { offset: 0x10, base: ['0x18'], label: 'Entry: 0x18' }],
+            [6, { offset: 0x14, base: ['0x19'], label: 'Entry: 0x19' }],
+            [7, { offset: 0x18, base: ['0x1A'], label: 'Entry: 0x1A' }],
+            [8, { offset: 0x1C, base: ['0x1B'], label: 'Entry: 0x1B' }],
+            [9, { offset: 0x20, base: ['0x25'], label: 'Entry: 0x25' }],
+            [10, { offset: 0x24, base: [], label: 'Unused' }],
+            [11, { offset: 0x28, base: ['0x32'], label: 'Entry: 0x32' }],
+            [12, { offset: 0x2C, base: ['0x31'], label: 'Entry: 0x31' }],
+            [13, { offset: 0x30, base: ['0x30'], label: 'Entry: 0x30' }],
+            [14, { offset: 0x34, base: ['0x37'], label: 'Entry: 0x37' }],
+            [15, { offset: 0x38, base: ['0x39'], label: 'Entry: 0x39' }],
+        ]);
+    }
+
+    // Opcodes starter catalog (seeded, can be extended via labels/notes)
+    function buildOpcodeCatalog() {
+        return new Map([
+            [0x13, { label: 'Floor Trigger (entry)', note: '' }],
+            [0x33, { label: 'ApplyDamage', note: 'Damage amount in first arg (00=dead)' }],
+            [0x3B, { label: 'ChangeMap', note: 'Requires preceding 0x13 entry command' }],
+            [0x3C, { label: 'SpawnEntity', note: 'Entity index (DBASE100) in arg 3' }],
+            [0x29, { label: 'AddInventory', note: 'Arg2 = Item ID' }],
+        ]);
+    }
+
+    // Parser
+    function parseRaw(buffer) {
+        const view = new DataView(buffer);
+        const hdr = {};
+        hdr.verticesOffset = view.getUint16(0x00, true);
+        hdr.version = view.getUint16(0x02, true);
+        hdr.sectorsOffset = view.getUint16(0x04, true);
+        hdr.facesOffset = view.getUint16(0x06, true);
+        hdr.faceTexMapsOffset = view.getUint16(0x08, true);
+        hdr.mapMetaOffset = view.getUint16(0x0A, true);
+        hdr.verticesOffsetRepeat = view.getUint16(0x0C, true);
+        hdr.signatureWR = readAscii(view, 0x0E, 2);
+        hdr.midPlatformsOffset = view.getUint16(0x10, true);
+        hdr.section7Size = view.getUint16(0x12, true);
+        hdr.verticesSectionSize = view.getUint16(0x14, true);
+        hdr.objectsSectionSize = view.getUint16(0x16, true);
+        hdr.footerSize = view.getUint16(0x18, true);
+        hdr.commandsSectionSize = view.getUint16(0x1A, true);
+        hdr.sectorCount = view.getUint16(0x1C, true);
+
+        const commandsStart = (hdr.verticesOffset >>> 0) + (hdr.verticesSectionSize >>> 0);
+        const commandsEnd = commandsStart + (hdr.commandsSectionSize >>> 0);
+
+        // Commands section header
+        const sig3u = readAscii(view, commandsStart + 0x00, 2);
+        const unk0x02 = view.getUint16(commandsStart + 0x02, true);
+        const allCmdsOffset = view.getUint16(commandsStart + 0x04, true);
+        const commandCount = view.getUint16(commandsStart + 0x06, true);
+        const entryCountsOffset = commandsStart + 0x08; // 0x3C bytes
+        const entryRefsStart = commandsStart + 0x44; // 2*commandCount bytes
+        const allCmdsStart = commandsStart + allCmdsOffset;
+
+        // Parse entry categories table (15 entries)
+        const categories = [];
+        for (let i = 0; i < 15; i++) {
+            const off = entryCountsOffset + i * 4;
+            const refOffsetFromSection = view.getUint16(off + 0, true);
+            const count = view.getUint16(off + 2, true);
+            categories.push({
+                index: i + 1,
+                refOffsetFromSection,
+                count,
+                refTableOffsetAbs: refOffsetFromSection ? (commandsStart + refOffsetFromSection) >>> 0 : 0,
+            });
+        }
+
+        // Parse all commands array
+        const commands = [];
+        const cmdOffsetToIndex = new Map();
+        let pos = allCmdsStart >>> 0;
+        for (let idx = 0; idx < commandCount && pos + 2 <= commandsEnd; idx++) {
+            const size = view.getUint16(pos + 0x00, true);
+            if (size === 0 || pos + size > commandsEnd) break;
+            const commandModifier = view.getUint8(pos + 0x02);
+            const commandBase = view.getUint8(pos + 0x03);
+            const nextIndex = view.getUint16(pos + 0x04, true); // 1-based, 0 ends chain
+            const numArgBytes = size - 0x06;
+            const numArgs = Math.max(0, Math.floor(numArgBytes / 2));
+            const args = [];
+            for (let j = 0; j < numArgs; j++) args.push(view.getUint16(pos + 0x06 + j * 2, true));
+            const index1 = commands.length + 1;
+            commands.push({ index1, size, commandModifier, commandBase, nextIndex, args, fileOffset: pos >>> 0 });
+            cmdOffsetToIndex.set(pos >>> 0, index1);
+            pos += size;
+        }
+
+        // Parse entry command references per category
+        const entryRefs = [];
+        for (const cat of categories) {
+            const refs = [];
+            if (cat.refTableOffsetAbs && cat.count > 0) {
+                let p = cat.refTableOffsetAbs >>> 0;
+                for (let i = 0; i < cat.count; i++) {
+                    const relCmdOff = view.getUint16(p, true);
+                    p += 2;
+                    const absCmdOff = (commandsStart + relCmdOff) >>> 0;
+                    const idx1 = cmdOffsetToIndex.get(absCmdOff) || 0;
+                    refs.push({ relCmdOff, absCmdOff, index1: idx1 });
+                }
+            }
+            entryRefs.push({ category: cat.index, refs });
+        }
+
+        // Build chains starting from entry refs
+        const chains = [];
+        for (const er of entryRefs) {
+            for (let r = 0; r < er.refs.length; r++) {
+                const startIndex1 = er.refs[r].index1;
+                if (!startIndex1 || startIndex1 < 1 || startIndex1 > commands.length) continue;
+                const seen = new Set();
+                const seq = [];
+                let cursor = startIndex1;
+                while (cursor && !seen.has(cursor)) {
+                    seen.add(cursor);
+                    const cmd = commands[cursor - 1];
+                    seq.push(cmd);
+                    cursor = cmd.nextIndex;
+                    if (cursor < 0 || cursor > commands.length) break;
+                }
+                chains.push({
+                    index: chains.length + 1,
+                    category: er.category,
+                    startIndex1,
+                    startOffset: (commands[startIndex1 - 1]?.fileOffset) >>> 0,
+                    length: seq.length,
+                    commands: seq,
+                });
+            }
+        }
+
+        // Aggregate opcode stats and usage
+        const opcodeCounts = new Map();
+        const opcodeUsages = {};
+        for (let i = 0; i < commands.length; i++) {
+            const c = commands[i];
+            const op = c.commandBase;
+            opcodeCounts.set(op, (opcodeCounts.get(op) || 0) + 1);
+        }
+        for (const ch of chains) {
+            for (let i = 0; i < ch.commands.length; i++) {
+                const c = ch.commands[i];
+                const key = '0x' + toHex(c.commandBase, 2);
+                if (!opcodeUsages[key]) opcodeUsages[key] = [];
+                opcodeUsages[key].push({
+                    chainIndex: ch.index,
+                    category: ch.category,
+                    argsHex: '0x' + toHex(c.args.length ? c.args[0] : 0, 4) + (c.args.length > 1 ? '…' : ''),
+                    cmdIndex1: c.index1,
+                    cmdOffset: '0x' + toHex(c.fileOffset, 8),
+                });
+            }
+        }
+
+        return {
+            header: hdr,
+            commandsSection: { commandsStart, commandsEnd, sig3u, unk0x02, allCmdsOffset, commandCount, entryRefsStart },
+            categories,
+            entryRefs,
+            commands,
+            chains,
+            opcodeStats: Object.fromEntries(opcodeCounts),
+            opcodeUsages,
+        };
+    }
+
+    // Build per-opcode argument statistics and references from an analysis (commands + chains context)
+    function buildOpcodeArgStatsFromAnalysis(a) {
+        const stats = {}; // opHex -> { lengths Map, argMode, args: [ { values: Map(valHex->{count, refs[]}) } ] }
+        const chains = a.chains || [];
+        const commands = a.commands || [];
+        // Map command index -> array of {chainIndex, category}
+        const cmdToChains = new Map();
+        for (const ch of chains) {
+            for (const cmd of ch.commands) {
+                if (!cmdToChains.has(cmd.index1)) cmdToChains.set(cmd.index1, []);
+                cmdToChains.get(cmd.index1).push({ chainIndex: ch.index, category: ch.category });
+            }
+        }
+        for (const cmd of commands) {
+            const opDec = cmd.commandBase >>> 0;
+            const opHex = '0x' + toHex(opDec, 2);
+            if (!stats[opHex]) stats[opHex] = { lengths: new Map(), argMode: 'fixed', args: [] };
+            const st = stats[opHex];
+            const len = cmd.args.length >>> 0;
+            st.lengths.set(len, (st.lengths.get(len) || 0) + 1);
+            while (st.args.length < len) st.args.push({ values: new Map() });
+            for (let i = 0; i < len; i++) {
+                const val = cmd.args[i] >>> 0;
+                const vHex = '0x' + toHex(val, 4);
+                const slot = st.args[i];
+                if (!slot.values.has(vHex)) slot.values.set(vHex, { count: 0, refs: [] });
+                const rec = slot.values.get(vHex);
+                rec.count += 1;
+                const links = cmdToChains.get(cmd.index1) || [ { chainIndex: null, category: null } ];
+                for (const l of links) {
+                    rec.refs.push({ chainIndex: l.chainIndex, category: l.category, cmdIndex1: cmd.index1, cmdOffset: '0x' + toHex(cmd.fileOffset, 8) });
+                }
+            }
+        }
+        for (const [opHex, st] of Object.entries(stats)) {
+            if (st.lengths.size > 1 || opHex.toLowerCase() === '0x23') st.argMode = 'variable';
+        }
+        return stats;
+    }
+
+    // UI wiring
+    function loadFile(inputEl, dropEl, cb) {
+        function setDrag(el, on) { el.classList[on ? 'add' : 'remove']('dragover'); }
+        dropEl.addEventListener('dragover', (e) => { e.preventDefault(); setDrag(dropEl, true); });
+        dropEl.addEventListener('dragleave', () => setDrag(dropEl, false));
+        dropEl.addEventListener('drop', async (e) => {
+            e.preventDefault(); setDrag(dropEl, false);
+            if (e.dataTransfer.files && e.dataTransfer.files[0]) { const buf = await e.dataTransfer.files[0].arrayBuffer(); cb(buf, e.dataTransfer.files[0].name); }
+        });
+        dropEl.addEventListener('click', () => inputEl.click());
+        inputEl.addEventListener('change', async () => { if (inputEl.files && inputEl.files[0]) { const buf = await inputEl.files[0].arrayBuffer(); cb(buf, inputEl.files[0].name); } });
+    }
+
+    loadFile(document.getElementById('fileRaw'), document.getElementById('dropZoneRaw'), (buf, name) => { rawBuffer = buf; multi = { files: [], analyses: [], totals: null }; loadStatus.textContent = 'RAW loaded.'; fileInfo.textContent = name; });
+
+    // Folder selection handling
+    (function wireFolderInput(){
+        const input = document.getElementById('fileRawFolder');
+        const dz = document.getElementById('dropZoneFolder');
+        if (!input || !dz) return;
+        function setDrag(el, on) { el.classList[on ? 'add' : 'remove']('dragover'); }
+        dz.addEventListener('click', () => input.click());
+        dz.addEventListener('dragover', (e) => { e.preventDefault(); setDrag(dz, true); });
+        dz.addEventListener('dragleave', () => setDrag(dz, false));
+        dz.addEventListener('drop', async (e) => {
+            e.preventDefault(); setDrag(dz, false);
+            const files = Array.from(e.dataTransfer.files || []);
+            await handleFolderFiles(files);
+        });
+        input.addEventListener('change', async () => {
+            const files = Array.from(input.files || []);
+            await handleFolderFiles(files);
+        });
+        async function handleFolderFiles(files) {
+            const raws = files.filter(f => /\.(raw|rawr)$/i.test(f.name));
+            if (!raws.length) { loadStatus.textContent = 'No RAW files in folder.'; return; }
+            loadStatus.textContent = `Loading ${raws.length} files...`;
+            const fileEntries = [];
+            for (const f of raws) {
+                try { const buf = await f.arrayBuffer(); fileEntries.push({ name: f.name, buffer: buf }); } catch {}
+            }
+            multi.files = fileEntries; rawBuffer = null; analysis = null;
+            fileInfo.textContent = `${fileEntries.length} files`;
+            loadStatus.textContent = 'Folder loaded.';
+            // populate scope selector
+            if (scopeSelect) {
+                scopeSelect.innerHTML = '';
+                const optAll = document.createElement('option'); optAll.value = 'ALL'; optAll.textContent = 'All files'; scopeSelect.appendChild(optAll);
+                for (const fe of fileEntries) { const opt = document.createElement('option'); opt.value = fe.name; opt.textContent = fe.name; scopeSelect.appendChild(opt); }
+            }
+        }
+    })();
+
+    document.getElementById('analyzeBtn').addEventListener('click', async () => {
+        try {
+            if (rawBuffer) {
+                statusEl.textContent = 'Parsing...';
+                analysis = parseRaw(rawBuffer);
+                analysis.opcodeArgStats = buildOpcodeArgStatsFromAnalysis(analysis);
+                multi = { files: [], analyses: [], totals: null };
+                statusEl.textContent = 'Parsed successfully. Rendering...';
+                renderHeader();
+                renderCategories();
+                renderOpcodes();
+                renderChains();
+                populateOpcodeSelect();
+                statusEl.textContent = 'Done.';
+                return;
+            }
+            if (multi.files && multi.files.length) {
+                statusEl.textContent = 'Parsing folder...';
+                multi.analyses = [];
+                for (const fe of multi.files) {
+                    const a = parseRaw(fe.buffer);
+                    a.fileName = fe.name;
+                    a.opcodeArgStats = buildOpcodeArgStatsFromAnalysis(a);
+                    for (const list of Object.values(a.opcodeUsages)) { for (const row of list) row.fileName = fe.name; }
+                    multi.analyses.push(a);
+                }
+                multi.totals = buildTotals(multi.analyses);
+                multi.opcodeArgStats = mergeOpcodeArgStats(multi.analyses);
+                statusEl.textContent = 'Parsed folder. Rendering...';
+                renderHeaderMulti();
+                renderOpcodesMulti();
+                renderChainsMulti();
+                populateOpcodeSelectMulti();
+                statusEl.textContent = 'Done.';
+                return;
+            }
+            statusEl.textContent = 'Please load a RAW file or a folder.';
+        } catch (e) {
+            console.error(e);
+            statusEl.textContent = 'Error: ' + e.message;
+        }
+    });
+
+    function buildTotals(analyses) {
+        const opcodeCounts = new Map();
+        const opcodeUsages = {};
+        for (const a of analyses) {
+            for (const [k, v] of Object.entries(a.opcodeStats)) {
+                const dec = Number(k);
+                opcodeCounts.set(dec, (opcodeCounts.get(dec) || 0) + v);
+            }
+            for (const [opHex, rows] of Object.entries(a.opcodeUsages)) {
+                if (!opcodeUsages[opHex]) opcodeUsages[opHex] = [];
+                opcodeUsages[opHex].push(...rows);
+            }
+        }
+        return { opcodeStats: Object.fromEntries(Array.from(opcodeCounts.entries())), opcodeUsages };
+    }
+
+    function mergeOpcodeArgStats(analyses) {
+        const out = {};
+        for (const a of analyses) {
+            const st = a.opcodeArgStats || {};
+            for (const [opHex, entry] of Object.entries(st)) {
+                if (!out[opHex]) out[opHex] = { lengths: new Map(), argMode: 'fixed', args: [] };
+                const dst = out[opHex];
+                for (const [len, cnt] of entry.lengths.entries()) dst.lengths.set(len, (dst.lengths.get(len) || 0) + cnt);
+                while (dst.args.length < entry.args.length) dst.args.push({ values: new Map() });
+                for (let i = 0; i < entry.args.length; i++) {
+                    const srcSlot = entry.args[i];
+                    const dstSlot = dst.args[i];
+                    for (const [valHex, rec] of srcSlot.values.entries()) {
+                        if (!dstSlot.values.has(valHex)) dstSlot.values.set(valHex, { count: 0, refs: [] });
+                        const d = dstSlot.values.get(valHex);
+                        d.count += rec.count;
+                        for (const r of rec.refs) d.refs.push({ ...r, fileName: a.fileName || null });
+                    }
+                }
+                if (entry.argMode === 'variable') dst.argMode = 'variable';
+            }
+        }
+        return out;
+    }
+
+    // Render header summary
+    function renderHeader() {
+        const el = document.getElementById('headerSummary');
+        if (!analysis) { el.textContent = 'Load a RAW file to view header info.'; return; }
+        const h = analysis.header;
+        const cs = analysis.commandsSection;
+        el.innerHTML = `
+            <div class="flex small">
+                <div>WR Sig: ${h.signatureWR}</div>
+                <div>Version: 0x${toHex(h.version, 4)}</div>
+                <div>Sectors: ${h.sectorCount}</div>
+                <div>Vertices@0x${toHex(h.verticesOffset,4)} size 0x${toHex(h.verticesSectionSize,4)}</div>
+                <div>Commands@0x${toHex(cs.commandsStart,8)} size 0x${toHex(h.commandsSectionSize,4)} sig ${cs.sig3u}</div>
+            </div>
+        `;
+    }
+
+    // Categories table + selector
+    function renderCategories() {
+        const catCatalog = buildCategoryCatalog();
+        categoriesTableBody.innerHTML = '';
+        const sel = document.getElementById('categorySelect');
+        sel.innerHTML = '';
+        const def = document.createElement('option'); def.value=''; def.textContent='Select category'; sel.appendChild(def);
+        let categoryLabels = {}; try { categoryLabels = JSON.parse(localStorage.getItem('rawCategoryLabels') || '{}'); } catch {}
+        const isMulti = multi && multi.files && multi.files.length;
+        if (!isMulti) {
+            for (const cat of analysis.categories) {
+                const meta = catCatalog.get(cat.index) || { base: [], label: '' };
+                const tr = document.createElement('tr');
+                const k = String(cat.index);
+                const lbl = categoryLabels[k] || meta.label || '';
+                const assoc = (meta.base || []).join(', ');
+                tr.innerHTML = `<td>${cat.index}</td><td>${cat.refOffsetFromSection? '0x'+toHex(cat.refTableOffsetAbs,8) : '—'}</td><td>${cat.count}</td><td>1</td><td>${assoc || '—'}</td><td>${lbl || '<span class=\"muted small\">(none)</span>'}</td>`;
+                categoriesTableBody.appendChild(tr);
+                const opt = document.createElement('option'); opt.value = String(cat.index); opt.textContent = lbl ? `${cat.index} [${lbl}]` : `${cat.index}`; sel.appendChild(opt);
+            }
+        } else {
+            // aggregate per category across files depending on scope
+            const scope = (scopeSelect && scopeSelect.value && scopeSelect.value !== 'ALL') ? scopeSelect.value : 'ALL';
+            const agg = new Map(); // catIndex -> { totalCount, files:Set, sampleOffset }
+            const sources = (scope === 'ALL') ? multi.analyses : multi.analyses.filter(a => a.fileName === scope);
+            for (const a of sources) {
+                for (const c of a.categories) {
+                    const e = agg.get(c.index) || { totalCount: 0, files: new Set(), sampleOffset: c.refOffsetFromSection? ('0x'+toHex(c.refTableOffsetAbs,8)) : '—' };
+                    e.totalCount += c.count;
+                    e.files.add(a.fileName);
+                    agg.set(c.index, e);
+                }
+            }
+            const rows = Array.from(agg.entries()).sort((a,b)=>a[0]-b[0]);
+            for (const [catIndex, data] of rows) {
+                const meta = catCatalog.get(catIndex) || { base: [], label: '' };
+                const lbl = categoryLabels[String(catIndex)] || meta.label || '';
+                const assoc = (meta.base || []).join(', ');
+                const fileCount = data.files.size;
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td>${catIndex}</td><td>${data.sampleOffset}</td><td>${data.totalCount}</td><td>${fileCount}</td><td>${assoc || '—'}</td><td>${lbl || '<span class=\"muted small\">(none)</span>'}</td>`;
+                categoriesTableBody.appendChild(tr);
+                const opt = document.createElement('option'); opt.value = String(catIndex); opt.textContent = lbl ? `${catIndex} [${lbl}]` : `${catIndex}`; sel.appendChild(opt);
+            }
+        }
+        document.getElementById('saveCategoryLabel').addEventListener('click', () => {
+            const key = document.getElementById('categorySelect').value; if (!key) return;
+            const input = document.getElementById('categoryLabel');
+            try { const labels = JSON.parse(localStorage.getItem('rawCategoryLabels') || '{}'); labels[String(key)] = input.value || ''; localStorage.setItem('rawCategoryLabels', JSON.stringify(labels)); renderCategories(); renderChains(); } catch {}
+        });
+    }
+
+    // Opcodes stats
+    function renderOpcodes() {
+        if (!analysis) return;
+        const catalog = buildOpcodeCatalog();
+        const notes = getNotes();
+        let storedLabels = {}; try { storedLabels = JSON.parse(localStorage.getItem('rawOpcodeLabels') || '{}'); } catch {}
+        const entries = Object.entries(analysis.opcodeStats).sort((a,b)=>Number(a[0]) - Number(b[0]));
+        // Coverage
+        const coverageText = document.getElementById('opcodeCoverageText');
+        const coverageBar = document.getElementById('opcodeCoverageBar');
+        const documented = entries.filter(([decStr]) => {
+            const dec = Number(decStr); const opHex = '0x' + toHex(dec,2);
+            const lbl = storedLabels[opHex] || (catalog.get(dec)?.label || '');
+            const note = notes[opHex] || '';
+            return (lbl && lbl.trim()) || (note && note.trim());
+        }).length;
+        const pct = entries.length ? Math.round((documented / entries.length) * 100) : 0;
+        coverageText.textContent = `Coverage: ${documented}/${entries.length} (${pct}%)`;
+        coverageBar.style.width = `${pct}%`;
+
+        opTableBody.innerHTML = '';
+        for (const [decStr, count] of entries) {
+            const dec = Number(decStr);
+            const opHex = '0x' + toHex(dec, 2);
+            const tr = document.createElement('tr');
+            const noteVal = notes[opHex] || '';
+            const labelDefault = catalog.get(dec)?.label || '';
+            const labelVal = storedLabels[opHex] || labelDefault;
+            tr.innerHTML = `<td class="nowrap op-select" data-opdec="${dec}">${opHex}</td><td>${dec}</td><td>${count}</td><td><input data-label="${opHex}" value="${labelVal}" placeholder="Label"/></td><td><textarea data-op="${opHex}" rows="2" style="width:100%" placeholder="Add note...">${noteVal}</textarea></td>`;
+            opTableBody.appendChild(tr);
+        }
+        // Handlers
+        opTableBody.querySelectorAll('textarea[data-op]').forEach(el => {
+            el.addEventListener('change', () => { const n = getNotes(); n[el.dataset.op] = el.value; setNotes(n); });
+        });
+        opTableBody.querySelectorAll('input[data-label]').forEach(el => {
+            el.addEventListener('change', () => { try { const labels = JSON.parse(localStorage.getItem('rawOpcodeLabels') || '{}'); labels[el.dataset.label] = el.value; localStorage.setItem('rawOpcodeLabels', JSON.stringify(labels)); } catch {} });
+        });
+
+        // Open inspector when clicking opcode cell
+        opTableBody.querySelectorAll('td.op-select').forEach(td => {
+            td.addEventListener('click', () => {
+                const dec = Number(td.getAttribute('data-opdec'));
+                if (!Number.isFinite(dec)) return;
+                selectedOpcodeDec = dec;
+                ensureOpcodeSelectedInSelect(dec);
+                renderOpcodeInspector(dec);
+            });
+        });
+
+        // Usage lookup
+        document.getElementById('showUsage').addEventListener('click', () => {
+            usageTableBody.innerHTML = '';
+            if (!analysis) return;
+            let val = (opcodeSearch.value || '').trim().toLowerCase(); if (!val) return;
+            let key; if (val.startsWith('0x')) key = val; else { const num = parseInt(val, 10); if (Number.isNaN(num)) return; key = '0x' + toHex(num, 2); }
+            const rows = (analysis.opcodeUsages && analysis.opcodeUsages[key]) || [];
+            let catLabels = {}; try { catLabels = JSON.parse(localStorage.getItem('rawCategoryLabels') || '{}'); } catch {}
+            let chainLabels = {}; try { chainLabels = JSON.parse(localStorage.getItem('rawChainLabels') || '{}'); } catch {}
+            for (const u of rows) {
+                const tr = document.createElement('tr');
+                const cLbl = chainLabels[String(u.chainIndex)] || '';
+                const catLbl = catLabels[String(u.category)] || '';
+                tr.innerHTML = `<td class="nowrap">${key}</td><td>${u.chainIndex}${cLbl? ' ['+cLbl+']':''}</td><td>${u.category}${catLbl? ' ['+catLbl+']':''}</td><td>${cLbl || ''}</td><td style="font-family:monospace">${u.argsHex}</td><td>${u.cmdIndex1}</td><td>${u.cmdOffset}</td>`;
+                usageTableBody.appendChild(tr);
+            }
+        });
+
+        // Notes import/export now bound globally
+    }
+
+    // Chains list and inspector
+    function renderChains() {
+        if (!analysis) return;
+        const tbody = chainsTableBody; tbody.innerHTML = '';
+        const q = (document.getElementById('chainSearch').value || '').trim().toLowerCase();
+        let catLabels = {}; try { catLabels = JSON.parse(localStorage.getItem('rawCategoryLabels') || '{}'); } catch {}
+        let chainLabels = {}; try { chainLabels = JSON.parse(localStorage.getItem('rawChainLabels') || '{}'); } catch {}
+        let flows = analysis.chains;
+        if (q) {
+            flows = flows.filter(f => {
+                if (String(f.index).includes(q)) return true;
+                const hexIndex = '0x' + toHex(f.index, 4); if (hexIndex.toLowerCase().includes(q)) return true;
+                return f.commands.some(a => ('0x' + toHex(a.commandBase, 2)).includes(q));
+            });
+        }
+        for (const f of flows) {
+            const tr = document.createElement('tr');
+            const cLbl = chainLabels[String(f.index)] || '';
+            const catLbl = catLabels[String(f.category)] || '';
+            const acts = f.commands.map(a => `${toHex(a.commandBase,2)}:${a.args.map(x=>'0x'+toHex(x,4)).join('|')}`).join(' ');
+            tr.innerHTML = `<td>${f.index} <span class="pill">0x${toHex(f.index,4)}</span></td><td><input data-chain-label="${f.index}" value="${cLbl}" placeholder="Label"/></td><td>${f.category}${catLbl? ' ['+catLbl+']':''}</td><td>0x${toHex(f.startOffset,8)}</td><td>${f.length}</td><td style="font-family:monospace">${acts}</td>`;
+            tr.addEventListener('click', () => renderChainInspector(f));
+            tbody.appendChild(tr);
+        }
+        // Wire label editors
+        tbody.querySelectorAll('input[data-chain-label]').forEach(el => {
+            el.addEventListener('change', () => {
+                try { const labels = JSON.parse(localStorage.getItem('rawChainLabels') || '{}'); labels[el.dataset.chainLabel] = el.value || ''; localStorage.setItem('rawChainLabels', JSON.stringify(labels)); } catch {}
+            });
+        });
+
+        document.getElementById('refreshChains').addEventListener('click', renderChains);
+        document.getElementById('chainSearch').addEventListener('input', renderChains);
+    }
+
+    // Aggregated header for multi
+    function renderHeaderMulti() {
+        const el = document.getElementById('headerSummary');
+        if (!multi || !multi.files.length) { el.textContent = 'Load a folder to view summary.'; return; }
+        const numFiles = multi.files.length;
+        el.innerHTML = `
+            <div class="flex small">
+                <div>Files: ${numFiles}</div>
+                <div>Scope: ${scopeSelect && scopeSelect.value ? scopeSelect.value : 'ALL'}</div>
+            </div>
+        `;
+    }
+
+    // Re-render categories on scope change in multi mode
+    if (scopeSelect) {
+        scopeSelect.addEventListener('change', () => {
+            if (multi && multi.files && multi.files.length) {
+                renderCategories();
+            }
+        });
+    }
+
+    // Aggregated opcode stats for multi
+    function renderOpcodesMulti() {
+        const catalog = buildOpcodeCatalog();
+        const notes = getNotes();
+        let storedLabels = {}; try { storedLabels = JSON.parse(localStorage.getItem('rawOpcodeLabels') || '{}'); } catch {}
+        const src = (scopeSelect && scopeSelect.value && scopeSelect.value !== 'ALL') ?
+            (multi.analyses.find(a => a.fileName === scopeSelect.value) || null) : null;
+        const stats = src ? src.opcodeStats : (multi.totals ? multi.totals.opcodeStats : {});
+        const entries = Object.entries(stats).sort((a,b)=>Number(a[0]) - Number(b[0]));
+        const coverageText = document.getElementById('opcodeCoverageText');
+        const coverageBar = document.getElementById('opcodeCoverageBar');
+        const documented = entries.filter(([decStr]) => {
+            const dec = Number(decStr); const opHex = '0x' + toHex(dec,2);
+            const lbl = storedLabels[opHex] || (catalog.get(dec)?.label || '');
+            const note = notes[opHex] || '';
+            return (lbl && lbl.trim()) || (note && note.trim());
+        }).length;
+        const pct = entries.length ? Math.round((documented / entries.length) * 100) : 0;
+        coverageText.textContent = `Coverage: ${documented}/${entries.length} (${pct}%)`;
+        coverageBar.style.width = `${pct}%`;
+        opTableBody.innerHTML = '';
+        for (const [decStr, count] of entries) {
+            const dec = Number(decStr);
+            const opHex = '0x' + toHex(dec, 2);
+            const tr = document.createElement('tr');
+            const noteVal = notes[opHex] || '';
+            const labelDefault = catalog.get(dec)?.label || '';
+            const labelVal = storedLabels[opHex] || labelDefault;
+            tr.innerHTML = `<td class="nowrap op-select" data-opdec="${dec}">${opHex}</td><td>${dec}</td><td>${count}</td><td><input data-label="${opHex}" value="${labelVal}" placeholder="Label"/></td><td><textarea data-op="${opHex}" rows="2" style="width:100%" placeholder="Add note...">${noteVal}</textarea></td>`;
+            opTableBody.appendChild(tr);
+        }
+        // Handlers
+        opTableBody.querySelectorAll('textarea[data-op]').forEach(el => { el.addEventListener('change', () => { const n = getNotes(); n[el.dataset.op] = el.value; setNotes(n); }); });
+        opTableBody.querySelectorAll('input[data-label]').forEach(el => { el.addEventListener('change', () => { try { const labels = JSON.parse(localStorage.getItem('rawOpcodeLabels') || '{}'); labels[el.dataset.label] = el.value; localStorage.setItem('rawOpcodeLabels', JSON.stringify(labels)); } catch {} }); });
+        opTableBody.querySelectorAll('td.op-select').forEach(td => {
+            td.addEventListener('click', () => { const dec = Number(td.getAttribute('data-opdec')); if (!Number.isFinite(dec)) return; selectedOpcodeDec = dec; ensureOpcodeSelectedInSelect(dec); renderOpcodeInspectorMulti(dec); });
+        });
+        document.getElementById('showUsage').addEventListener('click', () => {
+            usageTableBody.innerHTML = '';
+            let val = (opcodeSearch.value || '').trim().toLowerCase(); if (!val) return;
+            let key; if (val.startsWith('0x')) key = val; else { const num = parseInt(val, 10); if (Number.isNaN(num)) return; key = '0x' + toHex(num, 2); }
+            const rows = src ? ((src.opcodeUsages && src.opcodeUsages[key]) || []) : ((multi.totals && multi.totals.opcodeUsages && multi.totals.opcodeUsages[key]) || []);
+            let catLabels = {}; try { catLabels = JSON.parse(localStorage.getItem('rawCategoryLabels') || '{}'); } catch {}
+            let chainLabels = {}; try { chainLabels = JSON.parse(localStorage.getItem('rawChainLabels') || '{}'); } catch {}
+            for (const u of rows) {
+                const tr = document.createElement('tr');
+                const cLbl = chainLabels[String(u.chainIndex)] || '';
+                const catLbl = catLabels[String(u.category)] || '';
+                tr.innerHTML = `<td class="nowrap">${key}</td><td>${u.fileName || (src ? src.fileName || '' : '')}</td><td>${u.chainIndex}${cLbl? ' ['+cLbl+']':''}</td><td>${u.category}${catLbl? ' ['+catLbl+']':''}</td><td>${cLbl || ''}</td><td style=\"font-family:monospace\">${u.argsHex}</td><td>${u.cmdIndex1}</td><td>${u.cmdOffset}</td>`;
+                usageTableBody.appendChild(tr);
+            }
+        });
+    }
+
+    function populateOpcodeSelectMulti() {
+        if (!scopeSelect) return;
+        const sel = document.getElementById('opcodeSelect'); if (!sel) return;
+        sel.innerHTML = '';
+        const def = document.createElement('option'); def.value=''; def.textContent='Select opcode'; sel.appendChild(def);
+        const src = (scopeSelect.value && scopeSelect.value !== 'ALL') ? (multi.analyses.find(a => a.fileName === scopeSelect.value) || null) : null;
+        const stats = src ? src.opcodeStats : (multi.totals ? multi.totals.opcodeStats : {});
+        const entries = Object.entries(stats).sort((a,b)=>Number(a[0])-Number(b[0]));
+        for (const [decStr] of entries) { const dec = Number(decStr); const opt = document.createElement('option'); opt.value = String(dec); opt.textContent = `0x${toHex(dec,2)} (${dec})`; if (selectedOpcodeDec === dec) opt.selected = true; sel.appendChild(opt); }
+    }
+
+    function renderOpcodeInspectorMulti(dec) {
+        const summary = document.getElementById('opcodeSummary');
+        const argsContainer = document.getElementById('opcodeArgsContainer');
+        const refsContainer = document.getElementById('opcodeArgRefsContainer');
+        const opHex = '0x' + toHex(dec, 2);
+        const st = (function(){
+            const src = (scopeSelect && scopeSelect.value && scopeSelect.value !== 'ALL') ? (multi.analyses.find(a => a.fileName === scopeSelect.value) || null) : null;
+            const store = src ? src.opcodeArgStats : multi.opcodeArgStats;
+            return store ? store[opHex] : null;
+        })();
+        if (!st) { summary.textContent = `No data for ${opHex}.`; argsContainer.innerHTML = ''; refsContainer.innerHTML=''; return; }
+        const lengths = Array.from(st.lengths.entries()).sort((a,b)=>a[0]-b[0]).map(([k,v])=>`${k} (${v})`).join(', ');
+        summary.innerHTML = `<div class=\"flex small\"><div><strong>Opcode:</strong> ${opHex} (${dec})</div><div><strong>Arg mode:</strong> ${st.argMode}</div><div><strong>Arg lengths:</strong> ${lengths || '—'}</div></div>`;
+        let argNotes = {}; try { argNotes = JSON.parse(localStorage.getItem('rawOpcodeArgNotes') || '{}'); } catch {}
+        let argValueNotes = {}; try { argValueNotes = JSON.parse(localStorage.getItem('rawOpcodeArgValueNotes') || '{}'); } catch {}
+        const q = (document.getElementById('opcodeValueSearch').value || '').trim().toLowerCase();
+        const blocks = [];
+        for (let i = 0; i < st.args.length; i++) {
+            const slot = st.args[i]; if (!slot) continue;
+            const entries = Array.from(slot.values.entries());
+            const uniqueCount = entries.length;
+            entries.sort((a,b)=>b[1].count - a[1].count);
+            const top = entries.slice(0,5).map(([vh, obj]) => `${vh}(${obj.count})`).join(' ');
+            const argKey = `${opHex}#${i+1}`;
+            const argNote = argNotes[argKey] || '';
+            let filtered = entries;
+            if (q) filtered = entries.filter(([vh]) => vh.toLowerCase().includes(q) || String(parseInt(vh,16)).includes(q));
+            const rows = filtered.map(([vh, obj]) => {
+                const decVal = parseInt(vh, 16);
+                const vKey = `${opHex}#${i+1}#${vh}`;
+                const vNote = argValueNotes[vKey] || '';
+                return `<tr><td class=\"nowrap\">${vh}</td><td>${decVal}</td><td>${obj.count}</td><td><input data-argvalue-note=\"${vKey}\" value=\"${vNote}\" placeholder=\"Note\"/></td><td><button class=\"show-refs\" data-op=\"${opHex}\" data-argi=\"${i+1}\" data-val=\"${vh}\">Refs</button></td></tr>`;
+            }).join('');
+            const block = `
+                <div class=\"panel\" style=\"background:#2b2b2b\">
+                    <div class=\"flex\"><div><strong>Arg ${i+1}</strong></div><div class=\"small muted\">Unique: ${uniqueCount}</div><div class=\"small muted\">Top: ${top || '—'}</div></div>
+                    <div style=\"margin:6px 0\"><input data-arg-note=\"${argKey}\" value=\"${argNote}\" placeholder=\"Arg note\" style=\"width:100%\"/></div>
+                    <div class=\"list\"><table><thead><tr><th>Value</th><th>Dec</th><th>Count</th><th>Note</th><th>Refs</th></tr></thead><tbody>${rows}</tbody></table></div>
+                </div>
+            `;
+            blocks.push(block);
+        }
+        argsContainer.innerHTML = blocks.join('') || '<div class="small muted">No arguments recorded.</div>';
+        refsContainer.innerHTML = '';
+        argsContainer.querySelectorAll('input[data-arg-note]').forEach(el => { el.addEventListener('change', () => { try { const key = el.getAttribute('data-arg-note'); const data = JSON.parse(localStorage.getItem('rawOpcodeArgNotes') || '{}'); data[key] = el.value || ''; localStorage.setItem('rawOpcodeArgNotes', JSON.stringify(data)); } catch {} }); });
+        argsContainer.querySelectorAll('input[data-argvalue-note]').forEach(el => { el.addEventListener('change', () => { try { const key = el.getAttribute('data-argvalue-note'); const data = JSON.parse(localStorage.getItem('rawOpcodeArgValueNotes') || '{}'); data[key] = el.value || ''; localStorage.setItem('rawOpcodeArgValueNotes', JSON.stringify(data)); } catch {} }); });
+        argsContainer.querySelectorAll('button.show-refs').forEach(btn => { btn.addEventListener('click', () => { const op = btn.getAttribute('data-op'); const argi = Number(btn.getAttribute('data-argi')); const val = btn.getAttribute('data-val'); renderArgValueRefs(op, argi, val); }); });
+    }
+
+    // Aggregated chains table for multi
+    function renderChainsMulti() {
+        const tbody = chainsTableBody; if (!tbody) return; tbody.innerHTML = '';
+        const q = (document.getElementById('chainSearch').value || '').trim().toLowerCase();
+        let catLabels = {}; try { catLabels = JSON.parse(localStorage.getItem('rawCategoryLabels') || '{}'); } catch {}
+        let chainLabels = {}; try { chainLabels = JSON.parse(localStorage.getItem('rawChainLabels') || '{}'); } catch {}
+        const src = (scopeSelect && scopeSelect.value && scopeSelect.value !== 'ALL') ? (multi.analyses.find(a => a.fileName === scopeSelect.value) || null) : null;
+        let flows = [];
+        if (src) {
+            flows = src.chains.map(f => ({ ...f, __file: src.fileName }));
+        } else {
+            for (const a of (multi.analyses || [])) {
+                for (const f of a.chains) flows.push({ ...f, __file: a.fileName });
+            }
+        }
+        if (q) {
+            flows = flows.filter(f => {
+                if (String(f.index).includes(q)) return true;
+                const hexIndex = '0x' + toHex(f.index, 4); if (hexIndex.toLowerCase().includes(q)) return true;
+                if ((f.__file || '').toLowerCase().includes(q)) return true;
+                return f.commands.some(a => ('0x' + toHex(a.commandBase, 2)).includes(q));
+            });
+        }
+        for (const f of flows) {
+            const tr = document.createElement('tr');
+            const cLbl = chainLabels[String(f.index)] || '';
+            const catLbl = catLabels[String(f.category)] || '';
+            const acts = f.commands.map(a => `${toHex(a.commandBase,2)}:${a.args.map(x=>'0x'+toHex(x,4)).join('|')}`).join(' ');
+            const fileTag = f.__file ? ` <span class=\"pill\">${f.__file}</span>` : '';
+            tr.innerHTML = `<td>${f.index} <span class=\"pill\">0x${toHex(f.index,4)}</span>${fileTag}</td><td><input data-chain-label=\"${f.index}\" value=\"${cLbl}\" placeholder=\"Label\"/></td><td>${f.category}${catLbl? ' ['+catLbl+']':''}</td><td>0x${toHex(f.startOffset,8)}</td><td>${f.length}</td><td style=\"font-family:monospace\">${acts}</td>`;
+            tr.addEventListener('click', () => renderChainInspector(f));
+            tbody.appendChild(tr);
+        }
+        tbody.querySelectorAll('input[data-chain-label]').forEach(el => { el.addEventListener('change', () => { try { const labels = JSON.parse(localStorage.getItem('rawChainLabels') || '{}'); labels[el.dataset.chainLabel] = el.value || ''; localStorage.setItem('rawChainLabels', JSON.stringify(labels)); } catch {} }); });
+    }
+
+    if (scopeSelect) {
+        scopeSelect.addEventListener('change', () => {
+            if (multi && multi.files && multi.files.length) {
+                renderHeaderMulti();
+                renderOpcodesMulti();
+                renderChainsMulti();
+                populateOpcodeSelectMulti();
+                if (selectedOpcodeDec != null) renderOpcodeInspectorMulti(selectedOpcodeDec);
+            }
+        });
+    }
+
+    // Populate opcode select from stats
+    function populateOpcodeSelect() {
+        const sel = opcodeSelect; if (!sel || !analysis) return;
+        sel.innerHTML = '';
+        const def = document.createElement('option'); def.value=''; def.textContent='Select opcode'; sel.appendChild(def);
+        const entries = Object.entries(analysis.opcodeStats).sort((a,b)=>Number(a[0])-Number(b[0]));
+        for (const [decStr] of entries) {
+            const dec = Number(decStr);
+            const opt = document.createElement('option');
+            opt.value = String(dec);
+            opt.textContent = `0x${toHex(dec,2)} (${dec})`;
+            if (selectedOpcodeDec === dec) opt.selected = true;
+            sel.appendChild(opt);
+        }
+    }
+
+    function ensureOpcodeSelectedInSelect(dec) {
+        const sel = opcodeSelect; if (!sel) return;
+        for (const opt of Array.from(sel.options)) { opt.selected = (opt.value === String(dec)); }
+    }
+
+    // Render opcode inspector view
+    function renderOpcodeInspector(dec) {
+        const summary = document.getElementById('opcodeSummary');
+        const argsContainer = document.getElementById('opcodeArgsContainer');
+        const refsContainer = document.getElementById('opcodeArgRefsContainer');
+        if (!analysis || !analysis.opcodeArgStats) { summary.textContent = 'No data.'; return; }
+        const opHex = '0x' + toHex(dec, 2);
+        const st = analysis.opcodeArgStats[opHex];
+        if (!st) { summary.textContent = `No data for ${opHex}.`; argsContainer.innerHTML = ''; refsContainer.innerHTML=''; return; }
+        const lengths = Array.from(st.lengths.entries()).sort((a,b)=>a[0]-b[0]).map(([k,v])=>`${k} (${v})`).join(', ');
+        summary.innerHTML = `<div class="flex small"><div><strong>Opcode:</strong> ${opHex} (${dec})</div><div><strong>Arg mode:</strong> ${st.argMode}</div><div><strong>Arg lengths:</strong> ${lengths || '—'}</div></div>`;
+        let argNotes = {}; try { argNotes = JSON.parse(localStorage.getItem('rawOpcodeArgNotes') || '{}'); } catch {}
+        let argValueNotes = {}; try { argValueNotes = JSON.parse(localStorage.getItem('rawOpcodeArgValueNotes') || '{}'); } catch {}
+        const q = (document.getElementById('opcodeValueSearch').value || '').trim().toLowerCase();
+        const blocks = [];
+        for (let i = 0; i < st.args.length; i++) {
+            const slot = st.args[i]; if (!slot) continue;
+            const entries = Array.from(slot.values.entries());
+            const uniqueCount = entries.length;
+            entries.sort((a,b)=>b[1].count - a[1].count);
+            const top = entries.slice(0,5).map(([vh, obj]) => `${vh}(${obj.count})`).join(' ');
+            const argKey = `${opHex}#${i+1}`;
+            const argNote = argNotes[argKey] || '';
+            let filtered = entries;
+            if (q) filtered = entries.filter(([vh]) => vh.toLowerCase().includes(q) || String(parseInt(vh,16)).includes(q));
+            const rows = filtered.map(([vh, obj]) => {
+                const decVal = parseInt(vh, 16);
+                const vKey = `${opHex}#${i+1}#${vh}`;
+                const vNote = argValueNotes[vKey] || '';
+                return `<tr><td class=\"nowrap\">${vh}</td><td>${decVal}</td><td>${obj.count}</td><td><input data-argvalue-note=\"${vKey}\" value=\"${vNote}\" placeholder=\"Note\"/></td><td><button class=\"show-refs\" data-op=\"${opHex}\" data-argi=\"${i+1}\" data-val=\"${vh}\">Refs</button></td></tr>`;
+            }).join('');
+            const block = `
+                <div class=\"panel\" style=\"background:#2b2b2b\">
+                    <div class=\"flex\"><div><strong>Arg ${i+1}</strong></div><div class=\"small muted\">Unique: ${uniqueCount}</div><div class=\"small muted\">Top: ${top || '—'}</div></div>
+                    <div style=\"margin:6px 0\"><input data-arg-note=\"${argKey}\" value=\"${argNote}\" placeholder=\"Arg note\" style=\"width:100%\"/></div>
+                    <div class=\"list\"><table><thead><tr><th>Value</th><th>Dec</th><th>Count</th><th>Note</th><th>Refs</th></tr></thead><tbody>${rows}</tbody></table></div>
+                </div>
+            `;
+            blocks.push(block);
+        }
+        argsContainer.innerHTML = blocks.join('') || '<div class="small muted">No arguments recorded.</div>';
+        refsContainer.innerHTML = '';
+        argsContainer.querySelectorAll('input[data-arg-note]').forEach(el => {
+            el.addEventListener('change', () => {
+                try { const key = el.getAttribute('data-arg-note'); const data = JSON.parse(localStorage.getItem('rawOpcodeArgNotes') || '{}'); data[key] = el.value || ''; localStorage.setItem('rawOpcodeArgNotes', JSON.stringify(data)); } catch {}
+            });
+        });
+        argsContainer.querySelectorAll('input[data-argvalue-note]').forEach(el => {
+            el.addEventListener('change', () => {
+                try { const key = el.getAttribute('data-argvalue-note'); const data = JSON.parse(localStorage.getItem('rawOpcodeArgValueNotes') || '{}'); data[key] = el.value || ''; localStorage.setItem('rawOpcodeArgValueNotes', JSON.stringify(data)); } catch {}
+            });
+        });
+        argsContainer.querySelectorAll('button.show-refs').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const op = btn.getAttribute('data-op');
+                const argi = Number(btn.getAttribute('data-argi'));
+                const val = btn.getAttribute('data-val');
+                renderArgValueRefs(op, argi, val);
+            });
+        });
+    }
+
+    function renderArgValueRefs(opHex, argIndex1, valHex) {
+        const refsContainer = document.getElementById('opcodeArgRefsContainer');
+        refsContainer.innerHTML = '';
+        const st = (function(){
+            if (analysis && analysis.opcodeArgStats && (!multi.files || multi.files.length === 0)) return analysis.opcodeArgStats[opHex];
+            if (multi && multi.files && multi.files.length) {
+                const src = (scopeSelect && scopeSelect.value && scopeSelect.value !== 'ALL') ?
+                    (multi.analyses.find(a => a.fileName === scopeSelect.value) || null) : null;
+                const store = src ? src.opcodeArgStats : multi.opcodeArgStats;
+                return store ? store[opHex] : null;
+            }
+            return null;
+        })();
+        if (!st) return;
+        const slot = st.args[argIndex1 - 1]; if (!slot) return;
+        const rec = slot.values.get(valHex); if (!rec) { refsContainer.innerHTML = '<div class="small muted">No references.</div>'; return; }
+        let catLabels = {}; try { catLabels = JSON.parse(localStorage.getItem('rawCategoryLabels') || '{}'); } catch {}
+        const rows = rec.refs.map(r => {
+            const catLbl = catLabels[String(r.category)] || '';
+            return `<tr><td>${r.fileName || ''}</td><td>${r.chainIndex}</td><td>${r.category}${catLbl? ' ['+catLbl+']':''}</td><td>${r.cmdIndex1}</td><td>${r.cmdOffset}</td></tr>`;
+        }).join('');
+        refsContainer.innerHTML = `<div class=\"panel\" style=\"background:#2b2b2b\"><div class=\"flex\"><div><strong>Refs for ${opHex} Arg ${argIndex1} = ${valHex} (${parseInt(valHex,16)})</strong></div><div class=\"small muted\">Count: ${rec.count}</div></div><div class=\"list\"><table><thead><tr><th>File</th><th>Chain</th><th>Category</th><th>Cmd #</th><th>Offset</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+    }
+
+    // Wire controls in inspector panel
+    function isMultiActive() { return !!(multi && multi.files && multi.files.length); }
+    function renderSelectedOpcodeInspector() {
+        if (selectedOpcodeDec == null) return;
+        if (isMultiActive()) renderOpcodeInspectorMulti(selectedOpcodeDec); else renderOpcodeInspector(selectedOpcodeDec);
+    }
+    document.getElementById('refreshOpcodeInspector').addEventListener('click', () => { renderSelectedOpcodeInspector(); });
+    opcodeSelect.addEventListener('change', () => { const v = opcodeSelect.value; if (!v) return; selectedOpcodeDec = Number(v); renderSelectedOpcodeInspector(); });
+    document.getElementById('opcodeValueSearch').addEventListener('input', () => { renderSelectedOpcodeInspector(); });
+
+    function renderChainInspector(flow) {
+        const container = document.getElementById('chainInspector');
+        if (!container) return;
+        let opcodeLabels = {}; try { opcodeLabels = JSON.parse(localStorage.getItem('rawOpcodeLabels') || '{}'); } catch {}
+        let chainLabels = {}; try { chainLabels = JSON.parse(localStorage.getItem('rawChainLabels') || '{}'); } catch {}
+        const fLbl = chainLabels[String(flow.index)] || '';
+        const header = `<div class="flex"><div><strong>Chain:</strong> ${flow.index} <span class="pill">0x${toHex(flow.index,4)}</span></div><div><strong>Label:</strong> ${fLbl || '<span class=\"muted\">(none)</span>'}</div><div><strong>Category:</strong> ${flow.category}</div><div><strong>Start:</strong> 0x${toHex(flow.startOffset,8)}</div><div><strong>Len:</strong> ${flow.length}</div></div>`;
+        const rows = flow.commands.map((a, i) => {
+            const opHex = '0x' + toHex(a.commandBase, 2);
+            const lbl = opcodeLabels[opHex] || (buildOpcodeCatalog().get(a.commandBase)?.label || '');
+            const argsStr = a.args.length ? a.args.map(v => '0x' + toHex(v,4) + ` (${v})`).join(', ') : '<span class="muted">(none)</span>';
+            return `<tr><td>${i+1}</td><td>${opHex}${lbl? ' ['+lbl+']':''}</td><td>${argsStr}</td><td>${a.nextIndex}</td><td>0x${toHex(a.fileOffset,8)}</td></tr>`;
+        }).join('');
+        container.innerHTML = header + `<div class="list" style="margin-top:8px"><table><thead><tr><th>#</th><th>Opcode</th><th>Args</th><th>Next</th><th>Offset</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    }
+
+    // Collapsible panels
+    document.querySelectorAll('.panel-toggle').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const targetId = btn.getAttribute('data-target'); if (!targetId) return;
+            const target = document.getElementById(targetId); if (!target) return;
+            const isHidden = target.style.display === 'none';
+            target.style.display = isHidden ? '' : 'none';
+            btn.textContent = isHidden ? 'Collapse' : 'Expand';
+        });
+    });
+
+    function download(filename, text) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'text/plain' })); a.download = filename; a.click(); }
+
+    // Global notes import/export wiring
+    (function wireNotesImportExport(){
+        const exportBtn = document.getElementById('exportNotes');
+        const importBtn = document.getElementById('importNotes');
+        const importFile = document.getElementById('importNotesFile');
+        const clearBtn = document.getElementById('clearNotes');
+        if (exportBtn) exportBtn.addEventListener('click', () => {
+            const notes = getNotes();
+            const opcodeLabels = getJsonStorage('rawOpcodeLabels');
+            const categoryLabels = getJsonStorage('rawCategoryLabels');
+            const chainLabels = getJsonStorage('rawChainLabels');
+            const argNotes = getJsonStorage('rawOpcodeArgNotes');
+            const argValueNotes = getJsonStorage('rawOpcodeArgValueNotes');
+            const opcodes = {}; const keys = new Set([...Object.keys(notes), ...Object.keys(opcodeLabels)]);
+            for (const k of keys) opcodes[k] = { label: opcodeLabels[k] || '', note: notes[k] || '' };
+            const payload = { schemaVersion: 2, exportedAt: new Date().toISOString(), opcodes, notes, opcodeLabels, categoryLabels, chainLabels, argNotes, argValueNotes };
+            download('raw_annotations.json', JSON.stringify(payload, null, 2));
+        });
+        if (importBtn) importBtn.addEventListener('click', () => { if (importFile) importFile.click(); });
+        if (importFile) importFile.addEventListener('change', async (e) => {
+            const f = e.target.files && e.target.files[0]; if (!f) return;
+            try {
+                const txt = await f.text(); const data = JSON.parse(txt);
+                if (data && !data.schemaVersion && !data.notes && typeof data === 'object') { setNotes(data); statusEl.textContent = 'Legacy notes imported.'; }
+                else {
+                    if (data.opcodes && typeof data.opcodes === 'object') {
+                        const newNotes = {}; const newLabels = {};
+                        for (const [k, v] of Object.entries(data.opcodes)) { if (v && typeof v === 'object') { if (typeof v.note === 'string') newNotes[k] = v.note; if (typeof v.label === 'string') newLabels[k] = v.label; } }
+                        setNotes(newNotes); localStorage.setItem('rawOpcodeLabels', JSON.stringify(newLabels));
+                    } else { if (data.notes) setNotes(data.notes); if (data.opcodeLabels) localStorage.setItem('rawOpcodeLabels', JSON.stringify(data.opcodeLabels)); }
+                    if (data.categoryLabels) localStorage.setItem('rawCategoryLabels', JSON.stringify(data.categoryLabels));
+                    if (data.chainLabels) localStorage.setItem('rawChainLabels', JSON.stringify(data.chainLabels));
+                    if (data.argNotes) localStorage.setItem('rawOpcodeArgNotes', JSON.stringify(data.argNotes));
+                    if (data.argValueNotes) localStorage.setItem('rawOpcodeArgValueNotes', JSON.stringify(data.argValueNotes));
+                    statusEl.textContent = 'Annotations imported.';
+                }
+                // Re-render panels with current scope
+                if (multi && multi.files && multi.files.length) { renderOpcodesMulti(); populateOpcodeSelectMulti(); if (selectedOpcodeDec != null) renderOpcodeInspectorMulti(selectedOpcodeDec); }
+                else { renderOpcodes(); populateOpcodeSelect(); if (selectedOpcodeDec != null) renderOpcodeInspector(selectedOpcodeDec); }
+            } catch(err) { statusEl.textContent = 'Failed to import annotations: ' + err.message; }
+        });
+        if (clearBtn) clearBtn.addEventListener('click', () => { setNotes({}); if (multi && multi.files && multi.files.length) renderOpcodesMulti(); else renderOpcodes(); statusEl.textContent = 'Notes cleared.'; });
+    })();
+    </script>
+</body>
+<!--
+Open this file directly in a browser. Drag-drop a RAW/RAWR file.
+No build step required.
+-->
+</html>
+
+
