@@ -678,7 +678,7 @@
         const labelVal = itemLabels[itemKey] || '';
         const isLabelEnabled = (it.name === 'Monster' || it.name === 'Bullet');
         const labelCell = isLabelEnabled ? `<input data-item-label=\"${itemKey}\" value=\"${labelVal}\" placeholder=\"Add label (community name / weapon usage)\"/>` : '';
-        tr.innerHTML = `<td class=\"nowrap\">${it.index} <span class=\"pill\">0x${toHex(it.index + 1, 4)}</span></td><td>${it.name}</td><td class=\"nowrap\">${typeCell}</td><td class=\"nowrap\">${entryOffsetHex}</td><td class=\"small\" style=\"font-family:monospace\">${details}</td><td>${labelCell}</td><td style=\"font-family:monospace\">${triggerGroups}</td><td><button class=\"inspect-btn\" data-item=\"${it.index}\">Open</button></td>`;
+        tr.innerHTML = `<td class=\"nowrap\">${it.index + 1} <span class=\"pill\">0x${toHex(it.index + 1, 4)}</span></td><td>${it.name}</td><td class=\"nowrap\">${typeCell}</td><td class=\"nowrap\">${entryOffsetHex}</td><td class=\"small\" style=\"font-family:monospace\">${details}</td><td>${labelCell}</td><td style=\"font-family:monospace\">${triggerGroups}</td><td><button class=\"inspect-btn\" data-item=\"${it.index}\">Open</button></td>`;
         itemsTableBody.appendChild(tr);
       }
       totalsEl.textContent = `Items: ${analysis.items.length} • Monsters: ${analysis.monsters.length} • Bullets: ${analysis.bullets.length}`;

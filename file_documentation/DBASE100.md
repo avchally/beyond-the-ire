@@ -76,8 +76,8 @@ An inventory command section has the following format:
 Here is the list of possible TRIGGER_CODEs:
 | Code | Name | Description |
 | ----------- |  ----------- | ----------- |
-| 0x01 |  |  |
-| 0x02 |  |  |
+| 0x01 | OnInformation |  |
+| 0x02 | ChangeName | this executes whenever the item is hovered over in the inventory and is used to change the name of an item (via the `0x10` command).<br>Like the `0x01` trigger code, it can be controlled via the `0x01` conditional command (when placed after the first command).<br>Note: although only the `0x10` command is used to change the name, other commands can be used.  |
 | 0x04 | OnInspect | command chain triggers when item is inspected (right click in the environment or magnifying glass in inventory) |
 | 0x05 | WeaponAction | commands initialize data for when the weapon is fired |
 | 0x06 | AsBullet | commands initialize data for when the item is used as a projectile |
@@ -88,6 +88,7 @@ Here is the list of possible TRIGGER_CODEs:
 Notes:
 
 - `NAME_OFFSET` points to a DBASE400 entry. DBASE400 entries are strings with a color/font field; see [Interfaces Lookup Section](#interfaces-lookup-section) for a brief on DBASE400 layout.
+- See [DBASE100_inventory_examples.md](DBASE100_inventory_examples.md) for examples
 
 ITEM_TYPE values:
 

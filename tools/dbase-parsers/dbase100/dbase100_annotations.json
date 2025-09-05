@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "exportedAt": "2025-09-03T18:33:44.029Z",
+  "exportedAt": "2025-09-05T14:23:56.893Z",
   "opcodes": {
     "0x16": {
       "label": "TravelSpeed",
@@ -27,7 +27,7 @@
       "note": "DBASE400 offset"
     },
     "0x02": {
-      "label": "If item acount above, continue",
+      "label": "If item count above, continue",
       "note": "first two bytes represent the item index to check. the third byte represents the number to do a \"greater than\" comparison against."
     },
     "0x09": {
@@ -144,7 +144,7 @@
     },
     "0x26": {
       "label": "SetHealthOrHeal",
-      "note": "Initializes max health of a monster or heals by value"
+      "note": "Initializes max health of a monster or heals by value (when a value of 0x8002 or 0xE0C0 is provided, the game's main menu is displayed)"
     },
     "0x0f": {
       "label": "SetInformationTopic",
@@ -204,11 +204,23 @@
     },
     "0x82": {
       "label": "If item count below or equal, continue",
-      "note": "checks if the count of an item id in inventory is below a certain number and continues if so. first two bytes represent the item index to check. the third byte represents the number to do a \"less than\" comparison against."
+      "note": "checks if the count of an item id in inventory is less than or equal to a certain number and continues if so. first two bytes represent the item index to check. the third byte represents the number to do a \"less than or equal\" comparison against."
     },
     "0x83": {
       "label": "If item count equal, continue",
       "note": "checks if the count of an item id in inventory is equal to a certain amount. first two bytes represent the item index to check. the third byte represents the amount to compare with"
+    },
+    "0x2e": {
+      "label": "SetBulletDuration",
+      "note": "for a bullet, the amount of time before it despawns. Used for all melee attacks."
+    },
+    "0x13": {
+      "label": "SetWeaponBullet",
+      "note": "the item ID of the bullet to associate with a weapon"
+    },
+    "0x14": {
+      "label": "",
+      "note": "sets the max ammo before the weapon needs to be reloaded"
     },
     "0x04": {
       "label": "SetFlag",
@@ -228,10 +240,6 @@
     },
     "0x01": {
       "label": "If flag set, continue",
-      "note": ""
-    },
-    "0x13": {
-      "label": "SetWeaponBullet",
       "note": ""
     },
     "0x24": {
@@ -279,7 +287,7 @@
     "0x32": "the sound effect to play when the monster spawns",
     "0x05": "DBASE400 offset",
     "0x25": "Slightly influencing a monster's movement/pathing",
-    "0x26": "Initializes max health of a monster or heals by value",
+    "0x26": "Initializes max health of a monster or heals by value (when a value of 0x8002 or 0xE0C0 is provided, the game's main menu is displayed)",
     "0x0f": "used with the 0x01 trigger code to set up discussion topics when examining an item. value is the index (must confirm) to a string interface which will be displayed when the \"i\" button is pressed in inventory. when the topic is pressed, the contained command chain is run",
     "0x10": "used with the 0x02 trigger to change the name of an item (usually with some flag; if so call 0x01 AFTER this one). the value is the index (must confirm) of the string/interface",
     "0x07": "Cutscene index from DBASE100",
@@ -294,8 +302,11 @@
     "0x35": "performs a dbase100 command corresponding to its index",
     "0x34": "set during the OnUse trigger (0x0b) and makes the current item combinable with another item whose index is the argument required for this command. run 0xB4 after this to set the item that the two will be replaced with",
     "0xb4": "used after command 0x34 to determine the final item when two items are combined. value is the item index of the final result item. When no 0x34 command is used, the item can be combined with itself (ie, used).",
-    "0x82": "checks if the count of an item id in inventory is below a certain number and continues if so. first two bytes represent the item index to check. the third byte represents the number to do a \"less than\" comparison against.",
-    "0x83": "checks if the count of an item id in inventory is equal to a certain amount. first two bytes represent the item index to check. the third byte represents the amount to compare with"
+    "0x82": "checks if the count of an item id in inventory is less than or equal to a certain number and continues if so. first two bytes represent the item index to check. the third byte represents the number to do a \"less than or equal\" comparison against.",
+    "0x83": "checks if the count of an item id in inventory is equal to a certain amount. first two bytes represent the item index to check. the third byte represents the amount to compare with",
+    "0x2e": "for a bullet, the amount of time before it despawns. Used for all melee attacks.",
+    "0x13": "the item ID of the bullet to associate with a weapon",
+    "0x14": "sets the max ammo before the weapon needs to be reloaded"
   },
   "opcodeLabels": {
     "0x15": "MaxDamage",
@@ -306,7 +317,7 @@
     "0x28": "SetMonsterBullet",
     "0x05": "Play Audio Dialog",
     "0x00": "InventoryDocumentImage",
-    "0x02": "If item acount above, continue",
+    "0x02": "If item count above, continue",
     "0x04": "SetFlag",
     "0x08": "Choice string",
     "0x09": "Start choice sequence",
@@ -357,11 +368,13 @@
     "0x35": "Dbase100CommandCallback",
     "0x34": "CombineWithItem",
     "0xb4": "SetCombinedItem",
-    "0x83": "If item count equal, continue"
+    "0x83": "If item count equal, continue",
+    "0x2e": "SetBulletDuration"
   },
   "itemLabels": {
     "29": "Slanderer",
     "30": "Pyrichiel",
+    "33": "for Florentine's Staff",
     "55": "Pyrichiel Corpse Texture",
     "57": "from Belial (wand)",
     "58": "for Staff",
