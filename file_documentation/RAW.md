@@ -19,7 +19,7 @@ Most of the time, when a texture index is specified, 0xFFXX can also be used to 
 | 0x0C  | 2 | VERTICES_OFFSET_REPEAT | Offset to [vertices section](#vertices-section) (again, not sure why) |
 | 0x0E  | 2 | SIGNATURE | Signature is ASCII chars "WR" |
 | 0x10  | 2 | MID_PLATFORMS_SECTION | Offset to [intermediate platforms](#intermediate-platforms-section-wip) (if there are any, otherwise 0x00) |
-| 0x12  | 2 | SECTION_7_SIZE | Section 7 size TODO unknown section |
+| 0x12  | 2 | SFX_SECTION_SIZE | Size of the [SFX section](#sound-effects-sfx) |
 | 0x14  | 2 | VERTICES_SECTION_SIZE | Size of the [vertices section](#vertices-section) |
 | 0x16  | 2 | OBJECTS_SECTION_SIZE | Size of the [objects section](#objects-section) |
 | 0x18  | 2 | FOOTER_SIZE | [Footer](#footer) size |
@@ -27,7 +27,7 @@ Most of the time, when a texture index is specified, 0xFFXX can also be used to 
 | 0x1C  | 2 | SECTOR_COUNT | Number of objects in the [sectors section](#sectors-section) |
 
 The file size can be calculated with:  
-`FILE_SIZE = VERTICES_OFFSET + VERTICES_SECTION_SIZE + COMMANDS_SECTION_SIZE + SECTION_7_SIZE + OBJECTS_SECTION_SIZE + FOOTER_SIZE`;
+`FILE_SIZE = VERTICES_OFFSET + VERTICES_SECTION_SIZE + COMMANDS_SECTION_SIZE + SFX_SECTION_SIZE + OBJECTS_SECTION_SIZE + FOOTER_SIZE`;
 
 ## Sectors Section
 
@@ -307,107 +307,131 @@ The COMMAND_BASE is the actual command type and determines what the command does
 Each command has anywhere from 0 to 8 arguments that it is called/executed with.  
 Each command can also have a COMMAND_MODIFIER. Most of the time this is 0x00, but it could also be 0x08, 0x80, 0x88, or more depending on the command. What these modifiers do is still undetermined.
 
+
 | COMMAND_BASE | Possible COMMAND_MODIFIER's | Size | Used as Entry Command? | Description | Arg 1 | Arg 2 | Arg 3 | Arg 4 | Arg 5 | Arg 6 | Arg 7 | Arg 8 |
 | ----------- | ----------- | ----------- | ----------- | ----------- | ----------- | ----------- | ----------- | ----------- | ----------- | ----------- | ----------- | ----------- |
-| 0x01 | 00 | 0x06 |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
-| 0x02 | 00 | 0x10 | TRUE |  |  |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
-| 0x03 | 00 | 0x16 | TRUE | Used more often not as entry point |  |  |  |  |  |  |  |  |
-| 0x07 | 00 | 0x14 |  |  |  |  |  |  |  |  |  | XXXXXXXXXXX |
-| 0x08 | 00 | 0x0C | TRUE |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
-| 0x09 | 00 | 0x12 |  |  |  |  |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX |
-| 0x0A | 00 | 0x10 |  |  |  |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
-| 0x0C | 00 | 0x16 |  |  |  |  |  |  |  |  |  |  |
-| 0x0D | 00 | 0x0E |  |  |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
-| 0x0E | 00 | 0x0C |  |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
-| 0x0F | 00 | 0x0C |  |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
-| 0x10 | 00 | 0x0A |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
-| 0x11 | 00 | 0x0C |  |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
-| 0x12 | 00 | 0x08 |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
-| 0x13 | 00 | 0x0C | TRUE | Establishes a floor trigger. A sector specifies if it's associated with a floor trigger via the "self-assigned" ID (argument 2). Starts many CC's. Precedes a change map command (0x3B00). Is used in GRAVE as NON-ENTRY point |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
-| 0x15 | 00 | 0x0E |  |  |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
-| 0x16 | 00 | 0x0A |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
-| 0x17 | 00 | 0x0A |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
-| 0x18 | 00 | 0x14 | TRUE |  |  |  |  |  |  |  |  | XXXXXXXXXXX |
-| 0x19 | 00 | 0x14 | TRUE |  |  |  |  |  |  |  |  | XXXXXXXXXXX |
-| 0x1A | 00 | 0x0C | TRUE |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
-| 0x1B | 00 | 0x0C | TRUE |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
-| 0x1C | 00 | 0x0C |  |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
-| 0x1D | 00 | 0x0A |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
-| 0x1E | 00 | 0x0C |  |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
-| 0x1F | 00 | 0x12 |  |  |  |  |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX |
-| 0x20 | 00 | 0x0C |  |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
-| 0x22 | 00 | 0x12 |  |  |  |  |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX |
-| 0x23 | 00 | 0x10 or 0x14 |  |  |  |  |  |  |  |  |  | XXXXXXXXXXX |
-| 0x24 | 00 | 0x0C |  |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
-| 0x25 | 00 | 0x0E | TRUE |  |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
-| 0x26 | 00 | 0x0A |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
-| 0x27 | 00 | 0x0A |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
-| 0x28 | 00 | 0x0A |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
-| 0x29 | 00 | 0x0A |  | Add item to inventory |  | Item ID to add | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
-| 0x2A | 00 | 0x0A |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
-| 0x2B | 00 | 0x0A |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
-| 0x2D | 00 | 0x0A |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
-| 0x2E | 00 | 0x0A |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
-| 0x2F | 00 | 0x12 |  |  |  |  |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX |
-| 0x30 | 00 | 0x0C | TRUE |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
-| 0x31 | 00 | 0x14 | TRUE |  |  |  |  |  |  |  |  | XXXXXXXXXXX |
-| 0x32 | 00 | 0x14 | TRUE |  |  |  |  |  |  |  |  | XXXXXXXXXXX |
-| 0x33 | 00 | 0x0C |  | Applies damage. | Damage amount (00=dead) | Always 0 |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
-| 0x34 | 00 | 0x0C |  |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
-| 0x35 | 00 | 0x0E |  |  |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
-| 0x36 | 00 | 0x0A |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
-| 0x37 | 00 | 0x0C | TRUE |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
-| 0x38 | 00 | 0x0A |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
-| 0x39 | 00 | 0x0C | TRUE |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
-| 0x3A | 00 | 0x08 |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
-| 0x3B | 00 | 0x12 |  | Change map (requires preceding 0x1300 command) |  |  |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX |
-| 0x3C | 00 | 0x10 |  | Spawn entities using index id from DBASE100 (not texture relation index in ADEMO). |  |  | Entity ID |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
-| 0x3D | 00 | 0x0A |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
-| 0x3E | 00 | 0x06 |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
-| 0x3F | 00 | 0x08 |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
-| 0x40 | 00 | 0x08 |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
-| 0x41 | 00 | 0x08 |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
-| 0x42 | 00 | 0x08 |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x01 | 00 | 0x06 |  | Empty (No SFX) | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x02 | 00 | 0x10 | TRUE | Light Switch | Flags | Object ID | Sector ID |  | SFX Index | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x03 | 00 | 0x16 | TRUE | Modify Sector | Flags/Speed | Sector ID |  |  | Auto Revert Timeout |  |  |  |
+| 0x07 | 00 | 0x14 |  | Change Floor/Ceiling Height | Flags/Speed | Sector ID | Starting Height | Ending Height | Autoclose Timeout |  |  | XXXXXXXXXXX |
+| 0x08 | 00 | 0x0C | TRUE | On Left-Click Object | Flags | Object ID | SFX Index | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x09 | 00 | 0x12 |  | Move Sector | Flags/Speed | Sector ID |  |  | Auto Revert Timeout |  | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x0A | 00 | 0x10 |  | Change Floor Texture | Flags | Sector ID | Texture Index | X Shift / Y Shift | Auto Revert Timeout | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x0C | 00 | 0x16 |  | Change Face Texture Advanced | Flags | Face ID | Mid-Texture Index | X Shift / Y Shift | Auto Revert Timeout | Upper-Texture Index | Bottom-Texture Index |  |
+| 0x0D | 00 | 0x0E |  | Change Object Texture | Flags | Object ID | Auto Revert Timeout | Object Texture Index | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x0E | 00 | 0x0C |  | Scroll Sector Texture | Flags/X-Speed | Y-Speed / Sector ID | 00 | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x0F | 00 | 0x0C |  | Scroll Face Texture | Flags/X-Speed | Y-Speed/Sector ID | 00 | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x10 | 00 | 0x0A |  | Activate SFX Node | Flags | SFX Node ID | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x11 | 00 | 0x0C |  | Flash Lights | Flags | Sector ID |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x12 | 00 | 0x08 |  | Delay Timer | Timer | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x13 | 00 | 0x0C | TRUE | On Enter Sector | Flags | Sector ID | SFX Index | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x15 | 00 | 0x0E |  | Count | Flag |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x16 | 00 | 0x0A |  | Spawn Object Simple | Flags | Object ID | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x17 | 00 | 0x0A |  | Toggle Command | Flags | Command Index | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x18 | 00 | 0x14 | TRUE | On Left-Click Face | Flags | Face ID | SFX Index | Start X | End X | Start X | End Y | XXXXXXXXXXX |
+| 0x19 | 00 | 0x14 | TRUE | On Left-Click Floor | Flags | Sector ID | SFX Index | Start X | End X | Start Y | End Y | XXXXXXXXXXX |
+| 0x1A | 00 | 0x0C | TRUE | On Attack Face | Flags | Face ID |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x1B | 00 | 0x0C | TRUE | On Enemy Killed | Flags | Object ID |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x1C | 00 | 0x0C |  | Cycle Texture | Flags | Sector ID | Change to 1 Texture after this sector ID's texture | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x1D | 00 | 0x0A |  | Change Lighting | Flags | Sector ID | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x1E | 00 | 0x0C |  | Modify Count | Flags (2 = Add, 6 Subtract) | Command Index of Count Command | Amount | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x1F | 00 | 0x12 |  | Texture Change Count | Flags |  |  |  | Face ID | Starting Texture | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x20 | 00 | 0x0C |  | Cycle Object Texture | Flags | Object ID | Change to 1 Texture after this Object ID's texture | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x22 | 00 | 0x12 |  | Count (Additional Arg) | Flags |  |  |  |  |  | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x23 | 00 | 0x10 or 0x14 |  | Change Object Height | Flags/Speed (3 = Slow-Mo) | Object ID | Starting Height | Ending Height | Auto Revert Timeout |  |  | XXXXXXXXXXX |
+| 0x24 | 00 | 0x0C |  | Rotate Object | Flags (1 = counter-clockwise) | Flags | Object ID |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x25 | 00 | 0x0E | TRUE | On Texture Animation End | Flags | Texture Index | Ending Frame? |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x26 | 00 | 0x0A |  | Set/Unset Flag | Flags | Value (Flag) | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x27 | 00 | 0x0A |  | If Not Item | Flags | Item ID | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x28 | 00 | 0x0A |  | If Not Flag | Flags | Value (Flag) | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x29 | 00 | 0x0A |  | Give Item | Flags | Item ID | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x2A | 00 | 0x0A |  | Remove Item | Flags | Item ID | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x2B | 00 | 0x0A |  | DBASE100 Command | Flags | Global Command Index | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x2D | 00 | 0x0A |  | Particle Effect | Flags/Particles | Object Texture Index | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x2E | 00 | 0x0A |  | Smash Face Texture | Flags | Face ID | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x2F | 00 | 0x12 |  | Open Door | Flags | Face ID | Autoclose Timeout | Opening SFX | Closing SFX | Closed SFX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x30 | 00 | 0x0C | TRUE | On Right-click Object | Flags | Object ID | Global Command (DBASE100) | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x31 | 00 | 0x14 | TRUE | On Right-click Sector | Flags | Sector ID | Global Command (DBASE100) | Start X | End X | Start Y | End Y | XXXXXXXXXXX |
+| 0x32 | 00 | 0x14 | TRUE | On Right-click Face | Flags | Face ID | Global Command (DBASE100) | Start X | End X | Start Y | End Y | XXXXXXXXXXX |
+| 0x33 | 00 | 0x0C |  | Apply Damage | Flags/Damage |  | Range | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x34 | 00 | 0x0C |  | Change Face Texture Simple | Flags | Face ID | Mid-texture index | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x35 | 00 | 0x0E |  | Face Emits Damage | Flags/Damage | Face ID | Range |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x36 | 00 | 0x0A |  | DBASE100 Command if next fails | Flags | Global Command (DBASE100) | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x37 | 00 | 0x0C | TRUE | Change Texture if Command Chain True | Flags | Object Texture Index to Change | Object Texture Index to Change To | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x38 | 00 | 0x0A |  | Jump if Next Fails | Flags | Command Index | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x39 | 00 | 0x0C | TRUE | On Touch Object | Flags | Object ID | SFX Index | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x3A | 00 | 0x08 |  | Change Object ID | New ID | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x3B | 00 | 0x12 |  | Map Transition / Warp | Flags | Sector ID | Map Name | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x3C | 00 | 0x10 |  | Spawn Object Advanced | Flags | Object ID | Item ID | Change Object ID | SFX Index | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x3D | 00 | 0x0A |  | Autorun Timer | Timer |  | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x3E | 00 | 0x06 |  | Empty (Allow SFX) | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x3F | 00 | 0x08 |  | Player Rotation | Flags/Rotation | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x40 | 00 | 0x08 |  | Run Map Command | Command Index | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x41 | 00 | 0x08 |  | Slow Player Speed | Flags/Speed Reduction | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
+| 0x42 | 00 | 0x08 |  | Take Inventory | Flags (Give Back) | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX | XXXXXXXXXXX |
 
 
 
 
-## Section 7 (WIP)
+## Sound Effects (SFX)
 
 **Starts at `HEADER.VERTICES_OFFSET + HEADER.VERTICES_SECTION_SIZE + HEADER.COMMANDS_SECTION_SIZE`**
 
-Little is known about this section, but it tends to be pretty small. In my testing, modifying this resulted in no apparent changes. Even completely zeroing out the section showed no signs of altered gameplay. Will need to do more testing.
+This section contains SFX nodes contained in the map. An SFX node is a 2D point on the map from which a sound effect is played. It can either play continuously or be triggered by  commands. The first sub-section contains all of the SFX nodes.  
 
-There could be an additional optional section that contains 0x20-sized elements. The size of this sub-section is NOT included in the size of the overall section's header. It IS, however, included in the section size of the file's header.
+There could be an additional optional section which contains SFX zones.  
 
 The section is as follows:
 
 | Offset | Size (bytes) | Field | Description |
 | ----------- | ----------- | ----------- | ----------- |
-| 0x00  | 2 | SIZE_A | Size in bytes of the section's first sub-section |
-| 0x02  | 2 | COUNT | Count of elements in section's first array |
-| 0x04  | 0x12 * COUNT | UNKNOWN_ARRAY_01 | Array of section elements TODO |
-| SIZE_A | HEADER.SECTION_7_SIZE - SIZE_A | UNKNOWN_ARRAY_02 | Optionally, there may be an additional ending sub-section of 0x20-sized elements |
+| 0x00 | 2 | SIZE_SFX | Size in bytes of the SFX nodes sub-section |
+| 0x02 | 2 | COUNT | Count of elements in section's first array |
+| 0x04 | 0x12 * COUNT | SFX_NODES_ARRAY | Array of SFX node elements |
+| SIZE_SFX | HEADER.SFX_SECTION_SIZE - SIZE_SFX | SFX_ZONE_OBJECT_ARRAY | Optionally, there may be an additional ending sub-section of 0x20-sized elements |
 
-The element object for UNKNOWN_ARRAY_01:
+The element object for SFX_NODES_ARRAY:
 
 | Offset | Size (bytes) | Field | Description |
 | ----------- | ----------- | ----------- | ----------- |
-| 0x00 | 2 (signed) | UNK_0x00 | TODO |
-| 0x02 | 2 (signed) | UNK_0x02 | TODO |
-| 0x04 | 2 | UNK_0x04 | TODO |
-| 0x06 | 2 | UNK_0x06 | TODO |
-| 0x08 | 2 | UNK_0x08 | TODO |
-| 0x0A | 2 | UNK_0x0A | TODO |
+| 0x00 | 2 (signed) | POSITION_X | X-coordinate of the SFX node |
+| 0x02 | 2 (signed) | POSITION_Y | Y-coordinate of the SFX node |
+| 0x04 | 2 | SFX_INDEX | The index of the sound effect to play |
+| 0x06 | 2 | SFX_ID | The ID of this specific SFX node |
+| 0x08 | 1 | UNK_0x08 | 0x81 plays the sound continuously on loop. 0x01 only plays when activated (like from a command) |
+| 0x09 | 1 | SFX_ZONE_OBJECT_INDEX | The index within the SFX_ZONE_OBJECT_ARRAY to associate with this SFX node |
+| 0x0A | 2 | AUDIBLE_RADIUS | The distance from the node before it is no longer audible |
 | 0x0C | 2 | UNK_0x0C | TODO |
 | 0x0E | 2 | UNK_0x0E | TODO |
-| 0x10 | 2 | UNK_0x10 | TODO |
+| 0x10 | 1 | VOLUME | The volume to play the sound at. Standard seems to be 0x40 |
+| 0x10 | 1 | UNK_0x11 | maybe padding? |
 
-The element object for UNKNOWN_ARRAY_02:
+### SFX Zone Sub-Section
+
+This is an optional section containing SFX zone objects. An SFX node can optionally specify one of these zone objects. An SFX zone object can contain up to 3 defined SFX zones, which establish rectangular spaces in which an SFX node can be heard. When a player is outside of this zone, the audio from the SFX node can not be heard, regardless of the node's AUDIBLE_RADIUS.  
+
+The size of this sub-section is NOT included in the size of the overall section's header. It IS, however, included in the section size of the file's header.
+
+The SFX_ZONE_OBJECT_ARRAY is an array of SFX zone objects. Each object is exactly 0x20 in size and can contain up to 3 defined zones/areas. If there are less than 3 zones defined, the remaining bytes are `0x00`.  
+
+The element object for SFX_ZONE_OBJECT_ARRAY:  
 
 | Offset | Size (bytes) | Field | Description |
 | ----------- | ----------- | ----------- | ----------- |
-| 0x00 | 32 (0x20) | UNK_0x00 | TODO |
+| 0x00 | 2 | ZONE_COUNT | How many zones this object contains. Up to 3 |
+| 0x02 | 0x0A | SFX_ZONE_1 | The first defined SFX_ZONE |
+| 0x0C | 0x0A | SFX_ZONE_2 | The second defined SFX_ZONE or filled with 0x00 |
+| 0x16 | 0x0A | SFX_ZONE_3 | The third defined SFX_ZONE or filled with 0x00 |
+
+SFX_ZONE:  
+
+| Offset | Size (bytes) | Field | Description |
+| ----------- | ----------- | ----------- | ----------- |
+| 0x00 | 2 | UNK_0x00 | This isn't fully known, but it somehow determines how/when to allow this zone to be active<br>When just 1 zone, the value 0x02FF works |
+| 0x02 | 2 (signed) | X_BOUND_LOWER | The X distance from the SFX node to specify as the lower X bound of the rectangular zone |
+| 0x04 | 2 (signed) | Y_BOUND_LOWER | The Y distance from the SFX node to specify as the lower Y bound of the rectangular zone |
+| 0x06 | 2 (signed) | X_BOUND_UPPER | The X distance from the SFX node to specify as the upper X bound of the rectangular zone |
+| 0x08 | 2 (signed) | Y_BOUND_UPPER | The Y distance from the SFX node to specify as the upper Y bound of the rectangular zone |
 
 ## Objects Section
 
