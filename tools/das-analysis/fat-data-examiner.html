@@ -1802,6 +1802,189 @@ registerRenderer('OBJECT_3D', '3D Object (Textured)', function(container, infoEl
 });
 
 // =============================================================================
+// RENDERER: DIRECTIONAL_BILLBOARD
+// =============================================================================
+
+registerRenderer('DIRECTIONAL_BILLBOARD', 'Directional Billboard Object', function(container, infoEl, buffer, offset, length, pal) {
+    if (!pal) throw new Error('No palette loaded. Load ADEMO.DAS or another DAS with a palette.');
+
+    const view = new DataView(buffer);
+
+    // Minimum header size: 0x1E bytes
+    if (offset + 0x1E > buffer.byteLength) throw new Error('Data block too small for directional billboard header.');
+
+    const blockTypeMod = view.getUint8(offset);
+    const blockType = view.getUint8(offset + 1);
+    const highNibble = (blockTypeMod >> 4) & 0xF;
+
+    if (highNibble !== 0xC && highNibble !== 0xD) {
+        throw new Error(`Expected block_type_modifier high nibble 0xC or 0xD, got 0x${hex(highNibble, 1)} (full byte: ${hex8(blockTypeMod)})`);
+    }
+
+    const vertDisplacement = blockTypeMod & 0x0F;
+    const maxWidth = view.getUint16(offset + 0x02, true);
+    const maxHeight = view.getUint16(offset + 0x04, true);
+    const unk0x08 = view.getUint16(offset + 0x06, true);
+
+    // Read 8 direction entries (packed u16: bit 15 = flip, bits 0-14 = offset >> 4)
+    const DIR_LABELS = ['Dir 1 (Back)', 'Dir 2 (Back-Right)', 'Dir 3 (Right)', 'Dir 4 (Front-Right)',
+                        'Dir 5 (Front)', 'Dir 6 (Front-Left)', 'Dir 7 (Left)', 'Dir 8 (Back-Left)'];
+    const directions = [];
+    for (let d = 0; d < 8; d++) {
+        const entryOff = offset + 0x08 + d * 2;
+        const raw = view.getUint16(entryOff, true);
+        const isFlipped = (raw & 0x8000) !== 0;
+        const imgOffset = (raw & 0x7FFF) << 4; // bits 0-14 shifted left 4
+        directions.push({ raw, imgOffset, isFlipped, label: DIR_LABELS[d] });
+    }
+
+    // Parse IMAGE_DATA_ARRAY entries referenced by directions
+    // Build a map from imgOffset -> parsed image to avoid duplicates
+    const imageCache = new Map();
+
+    function parseImageAt(imgOffset) {
+        if (imageCache.has(imgOffset)) return imageCache.get(imgOffset);
+
+        const absOff = offset + imgOffset;
+        if (absOff + 8 > buffer.byteLength) {
+            imageCache.set(imgOffset, null);
+            return null;
+        }
+
+        const imageFlags = view.getUint16(absOff, true);
+        const imgWidth = view.getUint16(absOff + 2, true);
+        const imgHeight = view.getUint16(absOff + 4, true);
+
+        if (imgWidth <= 0 || imgHeight <= 0 || imgWidth > 2048 || imgHeight > 2048) {
+            imageCache.set(imgOffset, null);
+            return null;
+        }
+
+        const pixelStart = absOff + 6;
+        const pixelCount = imgWidth * imgHeight;
+        if (pixelStart + pixelCount > buffer.byteLength) {
+            imageCache.set(imgOffset, null);
+            return null;
+        }
+
+        const pixels = new Uint8Array(buffer, pixelStart, pixelCount);
+
+        // Create canvas for the raw image
+        const canvas = document.createElement('canvas');
+        canvas.width = imgWidth;
+        canvas.height = imgHeight;
+        const ctx = canvas.getContext('2d');
+        const imgData = ctx.createImageData(imgWidth, imgHeight);
+        for (let i = 0; i < pixelCount; i++) {
+            const palIdx = pixels[i] & 0xFF;
+            const c = pal[palIdx] || { r: 0, g: 0, b: 0 };
+            imgData.data[i * 4] = c.r;
+            imgData.data[i * 4 + 1] = c.g;
+            imgData.data[i * 4 + 2] = c.b;
+            imgData.data[i * 4 + 3] = palIdx === 0 ? 0 : 255;
+        }
+        ctx.putImageData(imgData, 0, 0);
+
+        const transposed = transposeCanvas(canvas);
+        const result = { canvas: transposed, width: transposed.width, height: transposed.height, imageFlags, pixelStart };
+        imageCache.set(imgOffset, result);
+        return result;
+    }
+
+    // Render all 8 directions in a grid
+    const gridContainer = document.createElement('div');
+    gridContainer.style.cssText = 'display:grid;grid-template-columns:repeat(4,auto);gap:12px;justify-content:start;align-items:start;';
+
+    for (let d = 0; d < 8; d++) {
+        const dir = directions[d];
+        const cell = document.createElement('div');
+        cell.style.textAlign = 'center';
+
+        const label = document.createElement('div');
+        label.className = 'small';
+        label.style.marginBottom = '4px';
+        label.style.color = 'var(--accent)';
+        label.style.fontWeight = '600';
+        label.textContent = dir.label;
+        cell.appendChild(label);
+
+        if (dir.imgOffset === 0) {
+            const noData = document.createElement('div');
+            noData.className = 'small muted';
+            noData.textContent = '(no image)';
+            cell.appendChild(noData);
+        } else {
+            const img = parseImageAt(dir.imgOffset);
+            if (!img) {
+                const errDiv = document.createElement('div');
+                errDiv.className = 'small';
+                errDiv.style.color = 'var(--red)';
+                errDiv.textContent = `Failed to parse image at offset 0x${hex(dir.imgOffset, 4)}`;
+                cell.appendChild(errDiv);
+            } else {
+                const displayCanvas = document.createElement('canvas');
+                const scale = Math.max(1, Math.min(4, Math.floor(Math.min(200 / img.width, 200 / img.height))));
+                displayCanvas.width = img.width * scale;
+                displayCanvas.height = img.height * scale;
+                displayCanvas.style.imageRendering = 'pixelated';
+                displayCanvas.style.border = '1px solid var(--border)';
+                displayCanvas.style.borderRadius = '4px';
+
+                const dctx = displayCanvas.getContext('2d');
+                dctx.imageSmoothingEnabled = false;
+
+                if (dir.isFlipped) {
+                    // Flip over Y axis
+                    dctx.translate(displayCanvas.width, 0);
+                    dctx.scale(-1, 1);
+                }
+                dctx.drawImage(img.canvas, 0, 0, displayCanvas.width, displayCanvas.height);
+
+                cell.appendChild(displayCanvas);
+
+                const meta = document.createElement('div');
+                meta.className = 'small muted';
+                meta.innerHTML = `${img.width}&times;${img.height}` +
+                    (dir.isFlipped ? ' <span style="color:var(--yellow)">(flipped)</span>' : '') +
+                    `<br>offset: 0x${hex(dir.imgOffset, 4)}`;
+                cell.appendChild(meta);
+            }
+        }
+
+        gridContainer.appendChild(cell);
+    }
+
+    container.appendChild(gridContainer);
+
+    // Info panel
+    const lines = [];
+    lines.push('=== Directional Billboard Object ===');
+    lines.push(`block_type_modifier: ${hex8(blockTypeMod)}  (high nibble: 0x${hex(highNibble, 1)}, vert displacement: ${vertDisplacement})`);
+    lines.push(`block_type:          ${hex8(blockType)}`);
+    lines.push(`max_width:           ${maxWidth}`);
+    lines.push(`max_height:          ${maxHeight}`);
+    lines.push(`unk_0x08:            ${hex16(unk0x08)}`);
+    lines.push('');
+    lines.push('Direction Table:');
+    for (let d = 0; d < 8; d++) {
+        const dir = directions[d];
+        lines.push(`  [${d}] ${dir.label.padEnd(22)} raw=${hex16(dir.raw)}  offset=0x${hex(dir.imgOffset, 4)}${dir.isFlipped ? '  (FLIPPED)' : ''}`);
+    }
+    lines.push('');
+    lines.push('Parsed Images:');
+    for (const [imgOff, img] of imageCache) {
+        if (img) {
+            lines.push(`  offset 0x${hex(imgOff, 4)}: ${img.width}x${img.height}  flags=${hex32(img.imageFlags)}  pixels at ${hex32(img.pixelStart)}`);
+        } else {
+            lines.push(`  offset 0x${hex(imgOff, 4)}: FAILED TO PARSE`);
+        }
+    }
+
+    infoEl.textContent = lines.join('\n');
+    infoEl.classList.remove('hidden');
+});
+
+// =============================================================================
 // 3D RENDERING HELPERS
 // =============================================================================
 
