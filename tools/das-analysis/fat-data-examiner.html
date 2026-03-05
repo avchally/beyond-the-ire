@@ -267,6 +267,7 @@ let filters = {};           // column key -> filter value
 
 // 3D viewer state
 let obj3d = null;
+let obj3dAnimTimer = null;
 let yaw3d = -0.4, pitch3d = 0.3;
 let dragging3d = false, lastMX = 0, lastMY = 0;
 let center3d = {x:0, y:0, z:0}, fitRadius3d = 1;
@@ -947,6 +948,10 @@ function downloadBinary() {
 // =============================================================================
 
 function runRenderer() {
+    // Clean up any running animation timers from previous renderers
+    if (compressedAnimTimer) { clearInterval(compressedAnimTimer); compressedAnimTimer = null; }
+    if (obj3dAnimTimer) { clearInterval(obj3dAnimTimer); obj3dAnimTimer = null; }
+
     const sel = document.getElementById('rendererSelect');
     const rendererId = sel.value;
     const outputEl = document.getElementById('rendererOutput');
@@ -1598,6 +1603,112 @@ function transposeCanvas(src) {
     return dst;
 }
 
+/**
+ * Decode a compressed image entry into an array of transposed canvases.
+ * Returns { frames: [canvas, ...], width, height } or null on failure.
+ * width/height are the transposed display dimensions of frame 0.
+ */
+function decodeCompressedEntry(buffer, offset, pal) {
+    const view = new DataView(buffer);
+    if (offset + 14 > buffer.byteLength) return null;
+
+    const width = view.getUint16(offset + 2, true);
+    const height = view.getUint16(offset + 4, true);
+    if (width <= 0 || height <= 0 || width > 2048 || height > 2048) return null;
+
+    const compOff = offset + 6;
+    const firstImgOffset = view.getUint16(compOff + 4, true);
+    const imgType2 = view.getUint16(compOff + 6, true);
+
+    const frames = [];
+
+    if (imgType2 !== 0xFFFE) {
+        // Type 1: Delta
+        const n = width * height;
+        const pixelStart = offset + firstImgOffset + 6;
+        if (pixelStart + n > buffer.byteLength) return null;
+
+        const rawImg = new Uint8Array(n);
+        rawImg.set(new Uint8Array(buffer, pixelStart, n));
+        frames.push(palettizeToCanvas(rawImg, width, height, pal));
+
+        let p = pixelStart + n;
+        for (let j = 0; j < imgType2; j++) {
+            let finished = false;
+            let pos = 0;
+            while (p < buffer.byteLength) {
+                const code = view.getUint8(p); p++;
+                if (code === 0) {
+                    if (p >= buffer.byteLength) break;
+                    const count = view.getUint8(p); p++;
+                    if (count === 0) { finished = true; break; }
+                    if (p >= buffer.byteLength) break;
+                    const value = view.getUint8(p); p++;
+                    for (let k = 0; k < count && pos + k < n; k++) rawImg[pos + k] = value;
+                    pos += count;
+                } else if (code > 0x80) {
+                    pos += (code & 0x7F);
+                } else if (code < 0x80) {
+                    for (let k = 0; k < code && p < buffer.byteLength; k++) {
+                        if (pos + k < n) rawImg[pos + k] = view.getUint8(p);
+                        p++;
+                    }
+                    pos += code;
+                } else {
+                    if (p + 2 > buffer.byteLength) break;
+                    let codeWord = view.getUint16(p, true); p += 2;
+                    if (codeWord === 0) break;
+                    if (codeWord & 0x8000) {
+                        codeWord &= 0x3FFF;
+                        if (p >= buffer.byteLength) break;
+                        const value = view.getUint8(p); p++;
+                        if (value === 0) {
+                            for (let k = 0; k < codeWord && pos + k < n; k++) rawImg[pos + k] = 0;
+                        } else { break; }
+                    }
+                    pos += codeWord;
+                }
+            }
+            if (finished) break;
+            frames.push(palettizeToCanvas(rawImg, width, height, pal));
+        }
+    } else {
+        // Type 2: RLE sub-images
+        let blockStart = offset + 16;
+        for (let frameIdx = 0; frameIdx < 256; frameIdx++) {
+            if (blockStart + 24 > buffer.byteLength) break;
+            const numImgs = view.getUint16(blockStart + 8, true);
+            const currImgSize = view.getUint32(blockStart + 12, true);
+            const subWidth = view.getUint16(blockStart + 18, true);
+            const subHeight = view.getUint16(blockStart + 22, true);
+            if (subWidth <= 0 || subHeight <= 0) break;
+
+            const imgSize = subWidth * subHeight;
+            const imgBuffer = new Uint8Array(imgSize);
+            let pos = 0, rp = blockStart + 24;
+            while (pos < imgSize && rp < buffer.byteLength) {
+                const byte = view.getUint8(rp); rp++;
+                if (byte > 0xF0) {
+                    const count = byte & 0x0F;
+                    if (rp >= buffer.byteLength) break;
+                    const nextByte = view.getUint8(rp); rp++;
+                    for (let j = 0; j < count && pos + j < imgSize; j++) imgBuffer[pos + j] = nextByte;
+                    pos += count;
+                } else {
+                    imgBuffer[pos] = byte;
+                    pos += 1;
+                }
+            }
+            frames.push(palettizeToCanvas(imgBuffer, subWidth, subHeight, pal));
+            blockStart += currImgSize;
+            if (frameIdx + 1 >= numImgs) break;
+        }
+    }
+
+    if (frames.length === 0) return null;
+    return { frames, width: frames[0].width, height: frames[0].height };
+}
+
 function resolveTextureForFace(face, dasFile, pal) {
     const texLookup = face.texture_lookup;
 
@@ -1654,7 +1765,27 @@ function resolveTextureForFace(face, dasFile, pal) {
             return result;
         }
 
-        // Case 3: Plain/flipped image used directly as texture
+        // Case 3: Compressed (animated) texture — odd imageType values
+        const COMPRESSED_TYPES = [0x11, 0x13, 0x31, 0x17, 0x33, 0x03];
+        if (COMPRESSED_TYPES.includes(imageType) && pal) {
+            const decoded = decodeCompressedEntry(buf, off, pal);
+            if (decoded && decoded.frames.length > 0) {
+                const result = {
+                    canvas: decoded.frames[0],
+                    width: decoded.width,
+                    height: decoded.height,
+                    frames: decoded.frames,
+                    info: `FAT[${texLookup}] compressed ${decoded.frames.length} frame(s) ${decoded.width}x${decoded.height} (type=${hex8(imageType)})`
+                };
+                texturePackCache.set(cacheKey, result);
+                return result;
+            }
+            const result = { canvas: null, width: 0, height: 0, info: `FAT[${texLookup}] compressed decode failed` };
+            texturePackCache.set(cacheKey, result);
+            return result;
+        }
+
+        // Case 4: Plain/flipped image used directly as texture
         if (!pal) {
             const result = { canvas: null, width: 0, height: 0, info: `FAT[${texLookup}] plain (no palette)` };
             texturePackCache.set(cacheKey, result);
@@ -1772,6 +1903,7 @@ function drawTexturedTriangle(ctx, texCanvas, x0, y0, u0, v0, x1, y1, u1, v1, x2
 // =============================================================================
 
 registerRenderer('OBJECT_3D', '3D Object (Textured)', function(container, infoEl, buffer, offset, length, pal) {
+    if (obj3dAnimTimer) { clearInterval(obj3dAnimTimer); obj3dAnimTimer = null; }
     const view = new DataView(buffer);
     let pos = offset;
 
@@ -1866,16 +1998,34 @@ registerRenderer('OBJECT_3D', '3D Object (Textured)', function(container, infoEl
     const texResolutionInfo = [];
     texturePackCache.clear();
 
+    let hasAnimatedTextures = false;
     for (const face of faces) {
         const resolved = resolveTextureForFace(face, dasFile, pal);
-        const texInfo = (resolved && resolved.canvas) ? { canvas: resolved.canvas, width: resolved.width, height: resolved.height } : null;
+        let texInfo = null;
+        if (resolved && resolved.canvas) {
+            texInfo = { canvas: resolved.canvas, width: resolved.width, height: resolved.height };
+            if (resolved.frames && resolved.frames.length > 1) {
+                texInfo.frames = resolved.frames;
+                hasAnimatedTextures = true;
+            }
+        }
         const info = `tex_lookup=${face.texture_lookup} sub_tex=${face.sub_texture_index} -> ${resolved ? resolved.info : 'unresolved'}`;
         faceTextures.push(texInfo);
         texResolutionInfo.push(info);
     }
 
     // Store for 3D viewer
-    obj3d = { vertices, faces, version, faceSectionSize, headerWords, warnings, faceTextures };
+    obj3d = { vertices, faces, version, faceSectionSize, headerWords, warnings, faceTextures, animFrame: 0 };
+
+    // Animated texture timer
+    if (obj3dAnimTimer) { clearInterval(obj3dAnimTimer); obj3dAnimTimer = null; }
+    if (hasAnimatedTextures) {
+        obj3dAnimTimer = setInterval(() => {
+            if (!obj3d) return;
+            obj3d.animFrame++;
+            render3DCanvas();
+        }, 100);
+    }
 
     // Create 3D canvas
     const canvas = document.createElement('canvas');
@@ -1935,7 +2085,8 @@ registerRenderer('OBJECT_3D', '3D Object (Textured)', function(container, infoEl
             thumb.appendChild(thumbCanvas);
             const label = document.createElement('div');
             label.className = 'small muted';
-            label.innerHTML = `FAT[${tex.texLookup}][${tex.subIdx}] ${tex.width}&times;${tex.height}<br>faces: ${tex.faceIndices.join(', ')}`;
+            const animLabel = (tex.frames && tex.frames.length > 1) ? `<br><span style="color:var(--yellow)">${tex.frames.length} frames (animated)</span>` : '';
+            label.innerHTML = `FAT[${tex.texLookup}][${tex.subIdx}] ${tex.width}&times;${tex.height}<br>faces: ${tex.faceIndices.join(', ')}${animLabel}`;
             thumb.appendChild(label);
             texPanel.appendChild(thumb);
         }
@@ -2277,6 +2428,10 @@ function render3DCanvas() {
         // Textured rendering
         if (showTex && obj3d.faceTextures && obj3d.faceTextures[fi]) {
             const texInfo = obj3d.faceTextures[fi];
+            // Pick the current animation frame if this is an animated texture
+            const texCanvas = (texInfo.frames && texInfo.frames.length > 1)
+                ? texInfo.frames[obj3d.animFrame % texInfo.frames.length]
+                : texInfo.canvas;
             const uvs = computeFaceUVs(obj3d.vertices, face.edgeArray, texInfo.width, texInfo.height);
 
             if (uvs && uvs.length >= 3) {
@@ -2289,7 +2444,7 @@ function render3DCanvas() {
                     const uv1 = uvs[i];
                     const uv2 = uvs[i + 1];
                     if (p0 && p1 && p2 && uv1 && uv2) {
-                        drawTexturedTriangle(ctx, texInfo.canvas,
+                        drawTexturedTriangle(ctx, texCanvas,
                             p0.x, p0.y, uv0.u, uv0.v,
                             p1.x, p1.y, uv1.u, uv1.v,
                             p2.x, p2.y, uv2.u, uv2.v
