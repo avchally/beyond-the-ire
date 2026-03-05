@@ -1031,15 +1031,11 @@ registerRenderer('PLAIN_DATA', 'Plain Data (Uncompressed Image)', function(conta
 
     const pixels = new Uint8Array(buffer, dataStart, pixelCount);
 
-    // Render to canvas
-    const canvas = document.createElement('canvas');
-    const scale = Math.max(1, Math.min(8, Math.floor(Math.min(512 / width, 512 / height))));
-    canvas.width = width * scale;
-    canvas.height = height * scale;
-    canvas.style.imageRendering = 'pixelated';
-
-    const ctx = canvas.getContext('2d');
-    const img = ctx.createImageData(width, height);
+    // Render to raw canvas, then transpose (ROTH stores images transposed)
+    const raw = document.createElement('canvas');
+    raw.width = width; raw.height = height;
+    const rawCtx = raw.getContext('2d');
+    const img = rawCtx.createImageData(width, height);
     for (let i = 0; i < pixelCount; i++) {
         const idx = pixels[i] & 0xFF;
         const c = pal[idx] || { r: 0, g: 0, b: 0 };
@@ -1048,17 +1044,22 @@ registerRenderer('PLAIN_DATA', 'Plain Data (Uncompressed Image)', function(conta
         img.data[i * 4 + 2] = c.b;
         img.data[i * 4 + 3] = idx === 0 ? 0 : 255;
     }
+    rawCtx.putImageData(img, 0, 0);
+    const transposed = transposeCanvas(raw);
 
-    const tmp = document.createElement('canvas');
-    tmp.width = width; tmp.height = height;
-    tmp.getContext('2d').putImageData(img, 0, 0);
+    const scale = Math.max(1, Math.min(8, Math.floor(Math.min(512 / transposed.width, 512 / transposed.height))));
+    const canvas = document.createElement('canvas');
+    canvas.width = transposed.width * scale;
+    canvas.height = transposed.height * scale;
+    canvas.style.imageRendering = 'pixelated';
+    const ctx = canvas.getContext('2d');
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(tmp, 0, 0, width * scale, height * scale);
+    ctx.drawImage(transposed, 0, 0, canvas.width, canvas.height);
 
     container.appendChild(canvas);
 
     // Info
-    infoEl.textContent = `=== Plain Data Image ===\nunk_flags:  ${hex8(unkFlags)}\nimage_type: ${hex8(imageType)}\nwidth:      ${width}\nheight:     ${height}\nPixel data: ${pixelCount} bytes at ${hex32(dataStart)}`;
+    infoEl.textContent = `=== Plain Data Image ===\nunk_flags:  ${hex8(unkFlags)}\nimage_type: ${hex8(imageType)}\nwidth:      ${width}\nheight:     ${height}\nDisplayed:  ${transposed.width}x${transposed.height} (transposed)\nPixel data: ${pixelCount} bytes at ${hex32(dataStart)}`;
     infoEl.classList.remove('hidden');
 });
 
@@ -1086,14 +1087,11 @@ registerRenderer('PLAIN_DATA_FLIPPED', 'Plain Data Flipped (Vertically Mirrored)
 
     const pixels = new Uint8Array(buffer, dataStart, pixelCount);
 
-    const canvas = document.createElement('canvas');
-    const scale = Math.max(1, Math.min(8, Math.floor(Math.min(512 / width, 512 / height))));
-    canvas.width = width * scale;
-    canvas.height = height * scale;
-    canvas.style.imageRendering = 'pixelated';
-
-    const ctx = canvas.getContext('2d');
-    const img = ctx.createImageData(width, height);
+    // Render to raw canvas with vertical flip, then transpose (ROTH stores images transposed)
+    const raw = document.createElement('canvas');
+    raw.width = width; raw.height = height;
+    const rawCtx = raw.getContext('2d');
+    const img = rawCtx.createImageData(width, height);
 
     // Render rows in reverse order (vertical flip)
     for (let y = 0; y < height; y++) {
@@ -1109,16 +1107,21 @@ registerRenderer('PLAIN_DATA_FLIPPED', 'Plain Data Flipped (Vertically Mirrored)
             img.data[dstIdx * 4 + 3] = palIdx === 0 ? 0 : 255;
         }
     }
+    rawCtx.putImageData(img, 0, 0);
+    const transposed = transposeCanvas(raw);
 
-    const tmp = document.createElement('canvas');
-    tmp.width = width; tmp.height = height;
-    tmp.getContext('2d').putImageData(img, 0, 0);
+    const scale = Math.max(1, Math.min(8, Math.floor(Math.min(512 / transposed.width, 512 / transposed.height))));
+    const canvas = document.createElement('canvas');
+    canvas.width = transposed.width * scale;
+    canvas.height = transposed.height * scale;
+    canvas.style.imageRendering = 'pixelated';
+    const ctx = canvas.getContext('2d');
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(tmp, 0, 0, width * scale, height * scale);
+    ctx.drawImage(transposed, 0, 0, canvas.width, canvas.height);
 
     container.appendChild(canvas);
 
-    infoEl.textContent = `=== Plain Data Flipped Image ===\nunk_flags:  ${hex8(unkFlags)}\nimage_type: ${hex8(imageType)}\nwidth:      ${width}\nheight:     ${height}\nPixel data: ${pixelCount} bytes at ${hex32(dataStart)}\n(Rows rendered bottom-to-top)`;
+    infoEl.textContent = `=== Plain Data Flipped Image ===\nunk_flags:  ${hex8(unkFlags)}\nimage_type: ${hex8(imageType)}\nwidth:      ${width}\nheight:     ${height}\nDisplayed:  ${transposed.width}x${transposed.height} (transposed, rows bottom-to-top)\nPixel data: ${pixelCount} bytes at ${hex32(dataStart)}`;
     infoEl.classList.remove('hidden');
 });
 
@@ -1144,7 +1147,7 @@ function palettizeToCanvas(pixels, w, h, pal) {
         img.data[i * 4 + 3] = idx === 0 ? 0 : 255;
     }
     ctx.putImageData(img, 0, 0);
-    return canvas;
+    return transposeCanvas(canvas);
 }
 
 registerRenderer('COMPRESSED', 'Compressed Image (Delta/RLE)', function(container, infoEl, buffer, offset, length, pal) {
@@ -1184,9 +1187,9 @@ registerRenderer('COMPRESSED', 'Compressed Image (Delta/RLE)', function(containe
 
     // Decode all frames
     const allFrameCanvases = [];
-    // Display dimensions: the max buffer size frames render into
-    let displayW = width;
-    let displayH = height;
+    // Display dimensions: the max buffer size frames render into (swapped due to transpose)
+    let displayW = height;
+    let displayH = width;
 
     if (imgType2 !== 0xFFFE) {
         // =====================================================================
@@ -1303,10 +1306,10 @@ registerRenderer('COMPRESSED', 'Compressed Image (Delta/RLE)', function(containe
             if (subWidth <= 0 || subHeight <= 0) break;
 
             if (frameIdx === 0) {
-                // Use buffer dimensions as display size (max frame extent)
+                // Use buffer dimensions as display size (swapped due to transpose)
                 if (bufWidth > 0 && bufHeight > 0) {
-                    displayW = bufWidth;
-                    displayH = bufHeight;
+                    displayW = bufHeight;
+                    displayH = bufWidth;
                 }
                 lines.push(`numImgs:         ${numImgs}`);
                 lines.push(`sub dimensions:  ${subWidth}x${subHeight}`);
