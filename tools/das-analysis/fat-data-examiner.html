@@ -1289,16 +1289,294 @@ function tryRLEDecompress(view, startOffset, maxPixels, bufLen) {
 }
 
 // =============================================================================
+// TEXTURE PACK PARSER (for unk_flags == 0x40 / 3D object texture entries)
+// =============================================================================
+
+const texturePackCache = new Map();
+
+function parseTexturePack(buffer, offset, pal) {
+    const view = new DataView(buffer);
+    let pos = offset;
+
+    // 6-byte block header
+    const unkFlags = view.getUint8(pos);
+    const imageType = view.getUint8(pos + 1);
+    const headerWidth = view.getUint16(pos + 2, true);
+    const headerHeight = view.getUint16(pos + 4, true);
+    pos += 6;
+
+    // Word array until 0x0000
+    const words = [];
+    while (pos + 2 <= buffer.byteLength) {
+        const w = view.getUint16(pos, true);
+        words.push(w);
+        pos += 2;
+        if (w === 0) break;
+    }
+    const nonZeroWords = words.filter(w => w !== 0);
+    const numImgs = Math.max(0, nonZeroWords.length - 1);
+    if (numImgs === 0) return { numImgs: 0, subImages: [] };
+
+    // Skip zero padding (match roth-editor: while get_8()==0: pass; seek(pos-2))
+    while (pos < buffer.byteLength && view.getUint8(pos) === 0) pos++;
+    pos -= 1; // back up 1 to match roth-editor alignment
+
+    const alignment = pos & 0xF;
+
+    // Read first sub-image header
+    if (pos + 6 > buffer.byteLength) return { numImgs: 0, subImages: [] };
+    let imgRef = view.getUint8(pos); pos++;
+    let imgType2 = view.getUint8(pos); pos++;
+    let w = view.getUint16(pos, true); pos += 2;
+    let h = view.getUint16(pos, true); pos += 2;
+
+    const subImages = [];
+    const u8 = new Uint8Array(buffer);
+
+    for (let j = 0; j < numImgs; j++) {
+        if (w <= 0 || h <= 0 || pos + w * h > buffer.byteLength) break;
+
+        let canvas = null;
+        if (pal) {
+            canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            const imgData = ctx.createImageData(w, h);
+            for (let pi = 0; pi < w * h; pi++) {
+                const palIdx = u8[pos + pi];
+                const c = pal[palIdx] || { r: 0, g: 0, b: 0 };
+                imgData.data[pi * 4] = c.r;
+                imgData.data[pi * 4 + 1] = c.g;
+                imgData.data[pi * 4 + 2] = c.b;
+                imgData.data[pi * 4 + 3] = palIdx === 0 ? 0 : 255;
+            }
+            ctx.putImageData(imgData, 0, 0);
+        }
+
+        subImages.push({ index: j, imgRef, imgType: imgType2, width: w, height: h, canvas });
+        pos += w * h;
+
+        // 16-byte alignment
+        const lowBits = pos & 0xF;
+        if (lowBits > alignment) pos += alignment + 0x10 - lowBits;
+        else pos += alignment - lowBits;
+
+        // Read next sub-image header
+        if (j + 1 < numImgs && pos + 6 <= buffer.byteLength) {
+            imgRef = view.getUint8(pos); pos++;
+            imgType2 = view.getUint8(pos); pos++;
+            w = view.getUint16(pos, true); pos += 2;
+            h = view.getUint16(pos, true); pos += 2;
+        }
+    }
+
+    return { numImgs, subImages };
+}
+
+// ROTH stores textures transposed (rotated 90 degrees). This corrects them.
+// Equivalent to rotate_90(CCW) + flip_y = simple transpose.
+function transposeCanvas(src) {
+    const w = src.width, h = src.height;
+    const dst = document.createElement('canvas');
+    dst.width = h; dst.height = w; // swapped
+    const srcData = src.getContext('2d').getImageData(0, 0, w, h);
+    const dstCtx = dst.getContext('2d');
+    const dstData = dstCtx.createImageData(h, w);
+    for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+            const si = (y * w + x) * 4;
+            const di = (x * h + y) * 4; // transposed
+            dstData.data[di]     = srcData.data[si];
+            dstData.data[di + 1] = srcData.data[si + 1];
+            dstData.data[di + 2] = srcData.data[si + 2];
+            dstData.data[di + 3] = srcData.data[si + 3];
+        }
+    }
+    dstCtx.putImageData(dstData, 0, 0);
+    return dst;
+}
+
+function resolveTextureForFace(face, dasFile, pal) {
+    const texLookup = face.texture_lookup;
+
+    // Case 1: Palette color reference (high byte == 0xFF)
+    if ((texLookup >> 8) === 0xFF) {
+        const palIdx = texLookup & 0xFF;
+        if (!pal) return { canvas: null, width: 1, height: 1, info: `palette[${palIdx}] (no palette)` };
+        const c = pal[palIdx] || { r: 0, g: 0, b: 0 };
+        const canvas = document.createElement('canvas');
+        canvas.width = 1; canvas.height = 1;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = `rgb(${c.r},${c.g},${c.b})`;
+        ctx.fillRect(0, 0, 1, 1);
+        return { canvas, width: 1, height: 1, info: `palette[${palIdx}] rgb(${c.r},${c.g},${c.b})` };
+    }
+
+    // Find the FAT entry
+    let texEntry = allEntries.find(e => e.dasFile === dasFile && e.fatIndex === texLookup);
+    if (!texEntry || texEntry.dataBlockOffset === 0) {
+        texEntry = allEntries.find(e => e.fatIndex === texLookup && e.dataBlockOffset > 0);
+    }
+    if (!texEntry || texEntry.dataBlockOffset === 0) {
+        return { canvas: null, width: 0, height: 0, info: `FAT[${texLookup}] not found` };
+    }
+
+    const cacheKey = `${texEntry.dasFile}:${texLookup}:${face.sub_texture_index}`;
+    if (texturePackCache.has(cacheKey)) return texturePackCache.get(cacheKey);
+
+    try {
+        const buf = texEntry._buffer;
+        const off = texEntry.dataBlockOffset;
+        const view = new DataView(buf);
+        const unkFlags = view.getUint8(off);
+        const imageType = view.getUint8(off + 1);
+        const width = view.getUint16(off + 2, true);
+        const height = view.getUint16(off + 4, true);
+
+        // Case 2: Texture pack (blockTypeModifier == 0x40)
+        if (texEntry.blockTypeModifier === 0x40) {
+            const pack = parseTexturePack(buf, off, pal);
+            if (pack && pack.subImages.length > 0) {
+                const subIdx = Math.min(face.sub_texture_index, pack.subImages.length - 1);
+                const sub = pack.subImages[subIdx];
+                if (sub && sub.canvas) {
+                    const tc = transposeCanvas(sub.canvas);
+                    const result = { canvas: tc, width: tc.width, height: tc.height,
+                                     info: `pack(${pack.numImgs} imgs) -> sub[${subIdx}] ${sub.width}x${sub.height} (transposed to ${tc.width}x${tc.height})` };
+                    texturePackCache.set(cacheKey, result);
+                    return result;
+                }
+            }
+            const result = { canvas: null, width: 0, height: 0, info: `pack at FAT[${texLookup}] failed` };
+            texturePackCache.set(cacheKey, result);
+            return result;
+        }
+
+        // Case 3: Plain/flipped image used directly as texture
+        if (!pal) {
+            const result = { canvas: null, width: 0, height: 0, info: `FAT[${texLookup}] plain (no palette)` };
+            texturePackCache.set(cacheKey, result);
+            return result;
+        }
+        if (width <= 0 || height <= 0 || width > 1024 || height > 1024) {
+            const result = { canvas: null, width: 0, height: 0, info: `FAT[${texLookup}] bad dims ${width}x${height}` };
+            texturePackCache.set(cacheKey, result);
+            return result;
+        }
+        const pixelStart = off + 6;
+        if (pixelStart + width * height > buf.byteLength) {
+            const result = { canvas: null, width: 0, height: 0, info: `FAT[${texLookup}] data truncated` };
+            texturePackCache.set(cacheKey, result);
+            return result;
+        }
+
+        const FLIPPED_TYPES = [0x10, 0x12, 0x14, 0x30];
+        const isFlipped = FLIPPED_TYPES.includes(imageType);
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        const imgData = ctx.createImageData(width, height);
+        const u8 = new Uint8Array(buf);
+
+        for (let y = 0; y < height; y++) {
+            const srcY = isFlipped ? (height - 1 - y) : y;
+            for (let x = 0; x < width; x++) {
+                const di = (y * width + x) * 4;
+                const palIdx = u8[pixelStart + srcY * width + x];
+                const c = pal[palIdx] || { r: 0, g: 0, b: 0 };
+                imgData.data[di] = c.r;
+                imgData.data[di + 1] = c.g;
+                imgData.data[di + 2] = c.b;
+                imgData.data[di + 3] = palIdx === 0 ? 0 : 255;
+            }
+        }
+        ctx.putImageData(imgData, 0, 0);
+        const tc = transposeCanvas(canvas);
+
+        const typeStr = isFlipped ? 'flipped' : 'plain';
+        const result = { canvas: tc, width: tc.width, height: tc.height, info: `FAT[${texLookup}] ${typeStr} ${width}x${height} (transposed to ${tc.width}x${tc.height}, type=${hex8(imageType)}, mod=${hex8(unkFlags)})` };
+        texturePackCache.set(cacheKey, result);
+        return result;
+    } catch (e) {
+        const result = { canvas: null, width: 0, height: 0, info: `FAT[${texLookup}] error: ${e.message}` };
+        texturePackCache.set(cacheKey, result);
+        return result;
+    }
+}
+
+function computeFaceUVs(vertices, edgeArray, texWidth, texHeight) {
+    const fv = edgeArray.map(i => vertices[i]).filter(Boolean);
+    if (fv.length < 3) return null;
+
+    const v0 = fv[0], v1 = fv[1], v2 = fv[2];
+    const e1x = v1.x - v0.x, e1y = v1.y - v0.y, e1z = v1.z - v0.z;
+    const e2x = v2.x - v0.x, e2y = v2.y - v0.y, e2z = v2.z - v0.z;
+    const e1Len = Math.sqrt(e1x * e1x + e1y * e1y + e1z * e1z);
+    if (e1Len < 1e-10) return null;
+    const ux = e1x / e1Len, uy = e1y / e1Len, uz = e1z / e1Len;
+
+    const nx = e1y * e2z - e1z * e2y, ny = e1z * e2x - e1x * e2z, nz = e1x * e2y - e1y * e2x;
+    const nLen = Math.sqrt(nx * nx + ny * ny + nz * nz);
+    if (nLen < 1e-10) return null;
+    const nnx = nx / nLen, nny = ny / nLen, nnz = nz / nLen;
+
+    const vx = nny * uz - nnz * uy, vy = nnz * ux - nnx * uz, vz = nnx * uy - nny * ux;
+
+    const projs = fv.map(v => ({
+        s: (v.x - v0.x) * ux + (v.y - v0.y) * uy + (v.z - v0.z) * uz,
+        t: (v.x - v0.x) * vx + (v.y - v0.y) * vy + (v.z - v0.z) * vz,
+    }));
+
+    let sMin = Infinity, sMax = -Infinity, tMin = Infinity, tMax = -Infinity;
+    for (const p of projs) {
+        if (p.s < sMin) sMin = p.s; if (p.s > sMax) sMax = p.s;
+        if (p.t < tMin) tMin = p.t; if (p.t > tMax) tMax = p.t;
+    }
+    const sRange = sMax - sMin || 1;
+    const tRange = tMax - tMin || 1;
+
+    return projs.map(p => ({
+        u: ((p.s - sMin) / sRange) * texWidth,
+        v: ((p.t - tMin) / tRange) * texHeight,
+    }));
+}
+
+function drawTexturedTriangle(ctx, texCanvas, x0, y0, u0, v0, x1, y1, u1, v1, x2, y2, u2, v2) {
+    const det = u0 * (v1 - v2) + u1 * (v2 - v0) + u2 * (v0 - v1);
+    if (Math.abs(det) < 0.001) return;
+
+    const a = (x0 * (v1 - v2) + x1 * (v2 - v0) + x2 * (v0 - v1)) / det;
+    const b = (y0 * (v1 - v2) + y1 * (v2 - v0) + y2 * (v0 - v1)) / det;
+    const c = (x0 * (u2 - u1) + x1 * (u0 - u2) + x2 * (u1 - u0)) / det;
+    const d = (y0 * (u2 - u1) + y1 * (u0 - u2) + y2 * (u1 - u0)) / det;
+    const e = (x0 * (u1 * v2 - u2 * v1) + x1 * (u2 * v0 - u0 * v2) + x2 * (u0 * v1 - u1 * v0)) / det;
+    const f = (y0 * (u1 * v2 - u2 * v1) + y1 * (u2 * v0 - u0 * v2) + y2 * (u0 * v1 - u1 * v0)) / det;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(x0, y0);
+    ctx.lineTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.closePath();
+    ctx.clip();
+    ctx.setTransform(a, b, c, d, e, f);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(texCanvas, 0, 0);
+    ctx.restore();
+}
+
+// =============================================================================
 // RENDERER: OBJECT_3D
 // =============================================================================
 
-registerRenderer('OBJECT_3D', '3D Object (Wireframe)', function(container, infoEl, buffer, offset, length, pal) {
+registerRenderer('OBJECT_3D', '3D Object (Textured)', function(container, infoEl, buffer, offset, length, pal) {
     const view = new DataView(buffer);
     let pos = offset;
 
     const imgType = view.getUint16(pos, true); pos += 2;
-    const imageTypeByte = (imgType >> 8) & 0xFF;   // high byte = image_type
-    const unkFlagsByte = imgType & 0xFF;            // low byte = unk_flags (can vary: 0x00, 0x10, etc.)
+    const imageTypeByte = (imgType >> 8) & 0xFF;
+    const unkFlagsByte = imgType & 0xFF;
     if (imageTypeByte !== 0x80) {
         throw new Error(`Expected image_type 0x80 for 3D object, got ${hex8(imageTypeByte)} (block type ${hex16(imgType)})`);
     }
@@ -1346,7 +1624,7 @@ registerRenderer('OBJECT_3D', '3D Object (Wireframe)', function(container, infoE
         const faceStart = pos;
         const faceDataSize = view.getUint16(pos, true); pos += 2;
         pos += 10; // skip unk_02 (4), unk_06 (4), unk_0A (2)
-        const texture_lookup = view.getUint16(pos, true); pos += 2;
+        const texture_lookup = view.getUint16(pos, false); pos += 2; // big-endian!
         pos += 8; // skip unk_0E, unk_10, unk_12, unk_14
         const render_type = view.getUint8(pos); pos += 1;
         const addt_render_flag = view.getUint8(pos); pos += 1;
@@ -1381,8 +1659,22 @@ registerRenderer('OBJECT_3D', '3D Object (Wireframe)', function(container, infoE
         }
     }
 
+    // Resolve textures for each face
+    const dasFile = selectedEntry ? selectedEntry.dasFile : '';
+    const faceTextures = [];
+    const texResolutionInfo = [];
+    texturePackCache.clear();
+
+    for (const face of faces) {
+        const resolved = resolveTextureForFace(face, dasFile, pal);
+        const texInfo = (resolved && resolved.canvas) ? { canvas: resolved.canvas, width: resolved.width, height: resolved.height } : null;
+        const info = `tex_lookup=${face.texture_lookup} sub_tex=${face.sub_texture_index} -> ${resolved ? resolved.info : 'unresolved'}`;
+        faceTextures.push(texInfo);
+        texResolutionInfo.push(info);
+    }
+
     // Store for 3D viewer
-    obj3d = { vertices, faces, version, faceSectionSize, headerWords, warnings };
+    obj3d = { vertices, faces, version, faceSectionSize, headerWords, warnings, faceTextures };
 
     // Create 3D canvas
     const canvas = document.createElement('canvas');
@@ -1397,11 +1689,57 @@ registerRenderer('OBJECT_3D', '3D Object (Wireframe)', function(container, infoE
     controls.style.marginTop = '8px';
     controls.innerHTML = `
         <select id="projMode3d"><option value="orthographic">Orthographic</option><option value="perspective">Perspective</option></select>
-        <label class="small" style="display:flex;align-items:center;gap:4px"><input type="checkbox" id="fillFaces3d" checked> Fill faces</label>
-        <label class="small" style="display:flex;align-items:center;gap:4px"><input type="checkbox" id="showVerts3d"> Show vertices</label>
+        <label class="small" style="display:flex;align-items:center;gap:4px"><input type="checkbox" id="showTextures3d" checked> Textures</label>
+        <label class="small" style="display:flex;align-items:center;gap:4px"><input type="checkbox" id="fillFaces3d"> Solid fill</label>
+        <label class="small" style="display:flex;align-items:center;gap:4px"><input type="checkbox" id="showWireframe3d" checked> Wireframe</label>
+        <label class="small" style="display:flex;align-items:center;gap:4px"><input type="checkbox" id="showVerts3d"> Vertices</label>
         <button class="small" onclick="yaw3d=-0.4;pitch3d=0.3;render3DCanvas()">Reset View</button>
     `;
     container.appendChild(controls);
+
+    // Texture thumbnails panel
+    const uniqueTextures = new Map();
+    faces.forEach((face, fi) => {
+        const tex = faceTextures[fi];
+        if (tex) {
+            const key = `${face.texture_lookup}:${face.sub_texture_index}`;
+            if (!uniqueTextures.has(key)) {
+                uniqueTextures.set(key, { ...tex, faceIndices: [], texLookup: face.texture_lookup, subIdx: face.sub_texture_index });
+            }
+            uniqueTextures.get(key).faceIndices.push(fi);
+        }
+    });
+
+    if (uniqueTextures.size > 0) {
+        const texPanel = document.createElement('div');
+        texPanel.style.cssText = 'margin-top:8px;display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start;';
+
+        const texLabel = document.createElement('div');
+        texLabel.className = 'small muted';
+        texLabel.style.width = '100%';
+        texLabel.textContent = `Resolved ${uniqueTextures.size} unique texture(s) from ${faces.length} faces:`;
+        texPanel.appendChild(texLabel);
+
+        for (const [key, tex] of uniqueTextures) {
+            const thumb = document.createElement('div');
+            thumb.style.textAlign = 'center';
+            const scale = Math.max(1, Math.min(4, Math.floor(80 / Math.max(tex.width, tex.height))));
+            const thumbCanvas = document.createElement('canvas');
+            thumbCanvas.width = tex.width * scale;
+            thumbCanvas.height = tex.height * scale;
+            thumbCanvas.style.cssText = 'image-rendering:pixelated;border:1px solid #3a4455;';
+            const tctx = thumbCanvas.getContext('2d');
+            tctx.imageSmoothingEnabled = false;
+            tctx.drawImage(tex.canvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
+            thumb.appendChild(thumbCanvas);
+            const label = document.createElement('div');
+            label.className = 'small muted';
+            label.innerHTML = `FAT[${tex.texLookup}][${tex.subIdx}] ${tex.width}&times;${tex.height}<br>faces: ${tex.faceIndices.join(', ')}`;
+            thumb.appendChild(label);
+            texPanel.appendChild(thumb);
+        }
+        container.appendChild(texPanel);
+    }
 
     // Setup interaction
     yaw3d = -0.4; pitch3d = 0.3;
@@ -1421,9 +1759,13 @@ registerRenderer('OBJECT_3D', '3D Object (Wireframe)', function(container, infoE
     const projSel = document.getElementById('projMode3d');
     const fillCb = document.getElementById('fillFaces3d');
     const vertsCb = document.getElementById('showVerts3d');
+    const texCb = document.getElementById('showTextures3d');
+    const wireCb = document.getElementById('showWireframe3d');
     if (projSel) projSel.addEventListener('change', render3DCanvas);
     if (fillCb) fillCb.addEventListener('change', render3DCanvas);
     if (vertsCb) vertsCb.addEventListener('change', render3DCanvas);
+    if (texCb) texCb.addEventListener('change', render3DCanvas);
+    if (wireCb) wireCb.addEventListener('change', render3DCanvas);
 
     render3DCanvas();
 
@@ -1442,9 +1784,11 @@ registerRenderer('OBJECT_3D', '3D Object (Wireframe)', function(container, infoE
     lines.push('Vertices:');
     vertices.forEach((v, i) => lines.push(`  [${i}] x=${v.x} y=${v.y} z=${v.z}`));
     lines.push('');
+    lines.push('Faces (with texture resolution):');
     for (let fi = 0; fi < faces.length; fi++) {
         const f = faces[fi];
-        lines.push(`Face[${fi}]: size=${f.faceDataSize} edges=${f.edge_count} tex_lookup=${f.texture_lookup} sub_tex=${f.sub_texture_index} render=${hex8(f.render_type)}`);
+        lines.push(`Face[${fi}]: size=${f.faceDataSize} edges=${f.edge_count} render=${hex8(f.render_type)} addt=${hex8(f.addt_render_flag)}`);
+        lines.push(`  ${texResolutionInfo[fi]}`);
         lines.push(`  edge_array: [${f.edgeArray.join(', ')}]`);
     }
     if (warnings.length) {
@@ -1517,50 +1861,95 @@ function render3DCanvas() {
         return;
     }
 
-    const projected = obj3d.vertices.map(v => project3D(rotatePoint3D(v), canvas));
+    // Rotate and project all vertices
+    const rotated = obj3d.vertices.map(v => rotatePoint3D(v));
+    const projected = rotated.map(v => project3D(v, canvas));
+
     const fillCb = document.getElementById('fillFaces3d');
     const vertsCb = document.getElementById('showVerts3d');
+    const texCb = document.getElementById('showTextures3d');
+    const wireCb = document.getElementById('showWireframe3d');
     const showFill = fillCb && fillCb.checked;
-    const showVerts = vertsCb ? vertsCb.checked : true;
+    const showVerts = vertsCb ? vertsCb.checked : false;
+    const showTex = texCb ? texCb.checked : false;
+    const showWire = wireCb ? wireCb.checked : true;
 
-    // Fill faces
-    if (showFill) {
-        for (let fi = 0; fi < obj3d.faces.length; fi++) {
-            const f = obj3d.faces[fi];
-            if (f.edgeArray.length < 3) continue;
+    // Depth-sort faces back-to-front (painter's algorithm)
+    const faceOrder = obj3d.faces.map((face, fi) => {
+        let avgZ = 0, count = 0;
+        for (const idx of face.edgeArray) {
+            if (idx >= 0 && idx < rotated.length) { avgZ += rotated[idx].z; count++; }
+        }
+        return { fi, avgZ: count > 0 ? avgZ / count : 0 };
+    });
+    faceOrder.sort((a, b) => a.avgZ - b.avgZ);
+
+    // Render faces in depth order
+    for (const { fi } of faceOrder) {
+        const face = obj3d.faces[fi];
+        const validIndices = face.edgeArray.filter(i => i >= 0 && i < projected.length);
+        if (validIndices.length < 3) continue;
+
+        // Textured rendering
+        if (showTex && obj3d.faceTextures && obj3d.faceTextures[fi]) {
+            const texInfo = obj3d.faceTextures[fi];
+            const uvs = computeFaceUVs(obj3d.vertices, face.edgeArray, texInfo.width, texInfo.height);
+
+            if (uvs && uvs.length >= 3) {
+                // Fan triangulation from first vertex
+                const p0 = projected[validIndices[0]];
+                const uv0 = uvs[0];
+                for (let i = 1; i < validIndices.length - 1; i++) {
+                    const p1 = projected[validIndices[i]];
+                    const p2 = projected[validIndices[i + 1]];
+                    const uv1 = uvs[i];
+                    const uv2 = uvs[i + 1];
+                    if (p0 && p1 && p2 && uv1 && uv2) {
+                        drawTexturedTriangle(ctx, texInfo.canvas,
+                            p0.x, p0.y, uv0.u, uv0.v,
+                            p1.x, p1.y, uv1.u, uv1.v,
+                            p2.x, p2.y, uv2.u, uv2.v
+                        );
+                    }
+                }
+            }
+        }
+        // Solid color fill fallback
+        else if (showFill) {
             ctx.beginPath();
-            const first = projected[f.edgeArray[0]];
+            const first = projected[validIndices[0]];
             if (!first) continue;
             ctx.moveTo(first.x, first.y);
-            for (let ei = 1; ei < f.edgeArray.length; ei++) {
-                const pt = projected[f.edgeArray[ei]];
+            for (let i = 1; i < validIndices.length; i++) {
+                const pt = projected[validIndices[i]];
                 if (pt) ctx.lineTo(pt.x, pt.y);
             }
             ctx.closePath();
-            const color = FACE_COLORS[fi % FACE_COLORS.length];
-            ctx.fillStyle = color + '33';
+            ctx.fillStyle = FACE_COLORS[fi % FACE_COLORS.length] + '33';
             ctx.fill();
         }
     }
 
-    // Draw edges
-    for (let fi = 0; fi < obj3d.faces.length; fi++) {
-        const f = obj3d.faces[fi];
-        const color = FACE_COLORS[fi % FACE_COLORS.length];
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 1.5 * dpr;
-        ctx.beginPath();
-        for (let ei = 0; ei < f.edgeArray.length; ei++) {
-            const pt = projected[f.edgeArray[ei]];
-            if (!pt) continue;
-            if (ei === 0) ctx.moveTo(pt.x, pt.y);
-            else ctx.lineTo(pt.x, pt.y);
+    // Wireframe edges
+    if (showWire) {
+        for (let fi = 0; fi < obj3d.faces.length; fi++) {
+            const f = obj3d.faces[fi];
+            const color = FACE_COLORS[fi % FACE_COLORS.length];
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 1.5 * dpr;
+            ctx.beginPath();
+            for (let ei = 0; ei < f.edgeArray.length; ei++) {
+                const pt = projected[f.edgeArray[ei]];
+                if (!pt) continue;
+                if (ei === 0) ctx.moveTo(pt.x, pt.y);
+                else ctx.lineTo(pt.x, pt.y);
+            }
+            ctx.closePath();
+            ctx.stroke();
         }
-        ctx.closePath();
-        ctx.stroke();
     }
 
-    // Draw vertices
+    // Vertices
     if (showVerts) {
         ctx.fillStyle = '#ffffff';
         for (const pt of projected) {
