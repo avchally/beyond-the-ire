@@ -243,7 +243,7 @@ const COLUMNS = [
     { key: 'dasFile',          label: 'DAS File',         mono: false, filterType: 'select' },
     { key: 'fatIndex',         label: 'FAT Index',        mono: true,  filterType: 'text' },
     { key: 'dataBlockOffset',  label: 'Offset',           mono: true,  filterType: 'text' },
-    { key: 'length',           label: 'Length',            mono: true,  filterType: 'text' },
+    { key: 'dataSize',         label: 'Data Size',         mono: true,  filterType: 'text' },
     { key: 'flag1',            label: 'Flag 1',           mono: true,  filterType: 'text' },
     { key: 'flag2',            label: 'Flag 2',           mono: true,  filterType: 'text' },
     { key: 'fileName',         label: 'File Name',        mono: false, filterType: 'text' },
@@ -434,7 +434,7 @@ function parseDASFile(name, buffer) {
     let p = header.imgFatOffset;
     for (let i = 0; i < totalFatCount && p + 8 <= fileSize; i++) {
         const dataBlockOffset = view.getUint32(p, true);
-        const lengthDiv2 = view.getUint16(p + 4, true);
+        const dataSizeBase = view.getUint16(p + 4, true);
         const flag1 = view.getUint8(p + 6);  // type
         const flag2 = view.getUint8(p + 7);  // specialInfo
 
@@ -446,11 +446,14 @@ function parseDASFile(name, buffer) {
             blockType = view.getUint8(dataBlockOffset + 1);          // second byte (high byte of u16LE)
         }
 
+        // Data size depends on flag2: when 0x11, shift left 4; otherwise multiply by 2
+        const dataSize = (flag2 === 0x11) ? (dataSizeBase << 4) : (dataSizeBase * 2);
+
         fatEntries.push({
             fatIndex: i,
             dataBlockOffset,
-            lengthDiv2,
-            length: lengthDiv2 * 2,
+            dataSizeBase,
+            dataSize,
             flag1,
             flag2,
             blockType,
@@ -500,7 +503,8 @@ function parseDASFile(name, buffer) {
             dasFile: name,
             fatIndex: fe.fatIndex,
             dataBlockOffset: fe.dataBlockOffset,
-            length: fe.length,
+            dataSizeBase: fe.dataSizeBase,
+            dataSize: fe.dataSize,
             flag1: fe.flag1,
             flag2: fe.flag2,
             fileName: nameInfo?.fileName ?? '',
@@ -682,7 +686,7 @@ function formatCellValue(entry, key) {
         case 'dasFile': return entry.dasFile;
         case 'fatIndex': return String(entry.fatIndex);
         case 'dataBlockOffset': return entry.dataBlockOffset > 0 ? hex32(entry.dataBlockOffset) : '0';
-        case 'length': return String(entry.length);
+        case 'dataSize': return String(entry.dataSize);
         case 'flag1': return hex8(entry.flag1);
         case 'flag2': return hex8(entry.flag2);
         case 'fileName': return entry.fileName;
@@ -710,7 +714,7 @@ function sortBy(key) {
 function applyFilters() {
     const hideZero = document.getElementById('hideZeroLength')?.checked;
     filteredEntries = allEntries.filter(entry => {
-        if (hideZero && entry.length === 0) return false;
+        if (hideZero && entry.dataSize === 0) return false;
         for (const col of COLUMNS) {
             const fv = filters[col.key];
             if (!fv) continue;
@@ -827,7 +831,7 @@ function selectEntry(entry, trEl) {
     summary.innerHTML = `
         <strong>${escHtml(entry.dasFile)}</strong> &mdash; FAT[${entry.fatIndex}]
         &nbsp;|&nbsp; Offset: <code>${hex32(entry.dataBlockOffset)}</code>
-        &nbsp;|&nbsp; Length: <code>${entry.length}</code> bytes
+        &nbsp;|&nbsp; Data Size: <code>${entry.dataSize}</code> bytes (base: ${entry.dataSizeBase})
         &nbsp;|&nbsp; Flags: <code>${hex8(entry.flag1)}</code> / <code>${hex8(entry.flag2)}</code>
         ${entry.fileName ? `&nbsp;|&nbsp; Name: <em>${escHtml(entry.fileName)}</em>` : ''}
         ${entry.blockType !== null ? `&nbsp;|&nbsp; Block Type: <code>${hex8(entry.blockType)}</code> Mod: <code>${hex8(entry.blockTypeModifier)}</code>` : ''}
@@ -871,7 +875,7 @@ function toggleHexDump() {
     const entry = selectedEntry;
     const buf = entry._buffer;
     const offset = entry.dataBlockOffset;
-    const length = entry.length;
+    const length = entry.dataSize;
 
     if (offset === 0 || offset >= buf.byteLength) {
         document.getElementById('hexDump').textContent = '(Empty entry — no data)';
@@ -901,7 +905,7 @@ function copyHexDump() {
     const entry = selectedEntry;
     const buf = entry._buffer;
     const offset = entry.dataBlockOffset;
-    const length = entry.length;
+    const length = entry.dataSize;
 
     if (offset === 0 || offset >= buf.byteLength) {
         showToast('No data to copy');
@@ -920,7 +924,7 @@ function downloadBinary() {
     const entry = selectedEntry;
     const buf = entry._buffer;
     const offset = entry.dataBlockOffset;
-    const length = entry.length;
+    const length = entry.dataSize;
 
     if (offset === 0 || offset >= buf.byteLength) {
         showToast('No data to download');
@@ -966,7 +970,7 @@ function runRenderer() {
     const entry = selectedEntry;
     const buf = entry._buffer;
     const offset = entry.dataBlockOffset;
-    const length = entry.length;
+    const length = entry.dataSize;
 
     if (offset === 0 || offset >= buf.byteLength) {
         outputEl.innerHTML = '<div class="renderer-error">Empty entry — no data to render.</div>';
@@ -1122,12 +1126,34 @@ registerRenderer('PLAIN_DATA_FLIPPED', 'Plain Data Flipped (Vertically Mirrored)
 // RENDERER: COMPRESSED
 // =============================================================================
 
+// Shared animation state so we can clean up between renders
+let compressedAnimTimer = null;
+
+function palettizeToCanvas(pixels, w, h, pal) {
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    const img = ctx.createImageData(w, h);
+    const n = w * h;
+    for (let i = 0; i < n; i++) {
+        const idx = (pixels[i] || 0) & 0xFF;
+        const c = pal[idx] || { r: 0, g: 0, b: 0 };
+        img.data[i * 4] = c.r;
+        img.data[i * 4 + 1] = c.g;
+        img.data[i * 4 + 2] = c.b;
+        img.data[i * 4 + 3] = idx === 0 ? 0 : 255;
+    }
+    ctx.putImageData(img, 0, 0);
+    return canvas;
+}
+
 registerRenderer('COMPRESSED', 'Compressed Image (Delta/RLE)', function(container, infoEl, buffer, offset, length, pal) {
     if (!pal) throw new Error('No palette loaded. Load ADEMO.DAS or another DAS with a palette.');
+    if (compressedAnimTimer) { clearInterval(compressedAnimTimer); compressedAnimTimer = null; }
 
     const view = new DataView(buffer);
 
-    if (offset + 6 > buffer.byteLength) throw new Error('Data block too small for image header.');
+    if (offset + 14 > buffer.byteLength) throw new Error('Data block too small for compressed image header.');
     const unkFlags = view.getUint8(offset);
     const imageType = view.getUint8(offset + 1);
     const width = view.getUint16(offset + 2, true);
@@ -1136,157 +1162,321 @@ registerRenderer('COMPRESSED', 'Compressed Image (Delta/RLE)', function(containe
     if (width <= 0 || height <= 0) throw new Error(`Invalid image dimensions: ${width}x${height}`);
     if (width > 2048 || height > 2048) throw new Error(`Dimensions too large: ${width}x${height}`);
 
-    // Parse compression header (12 bytes after image header)
+    // 8-byte compression header after the 6-byte basic header
     const compOff = offset + 6;
-    if (compOff + 12 > buffer.byteLength) throw new Error('Data block too small for compression header.');
-
     const blockSize = view.getUint16(compOff, true);
     const compUnk = view.getUint16(compOff + 2, true);
     const firstImgOffset = view.getUint16(compOff + 4, true);
-    const frameCount = view.getUint16(compOff + 6, true);
-    const compUnk2 = view.getUint16(compOff + 8, true);
-    const compUnk3 = view.getUint16(compOff + 10, true);
+    const imgType2 = view.getUint16(compOff + 6, true);
 
     const lines = [];
     lines.push('=== Compressed Image ===');
-    lines.push(`unk_flags:      ${hex8(unkFlags)}`);
-    lines.push(`image_type:     ${hex8(imageType)}`);
-    lines.push(`width:          ${width}`);
-    lines.push(`height:         ${height}`);
+    lines.push(`unk_flags:       ${hex8(unkFlags)}`);
+    lines.push(`image_type:      ${hex8(imageType)}`);
+    lines.push(`width:           ${width}`);
+    lines.push(`height:          ${height}`);
     lines.push('');
     lines.push('=== Compression Header ===');
-    lines.push(`block_size:     ${blockSize}`);
-    lines.push(`unk:            ${compUnk}`);
-    lines.push(`first_img_off:  ${firstImgOffset}`);
-    lines.push(`frame_count:    ${hex16(frameCount)} (${frameCount})`);
-    lines.push(`unk2:           ${compUnk2}`);
-    lines.push(`unk3:           ${compUnk3}`);
+    lines.push(`block_size:      ${blockSize}`);
+    lines.push(`unk:             ${compUnk}`);
+    lines.push(`first_img_off:   ${firstImgOffset} (${hex16(firstImgOffset)})`);
+    lines.push(`img_type_2:      ${hex16(imgType2)} (${imgType2})`);
 
-    let pixels = null;
-    let renderWidth = width;
-    let renderHeight = height;
+    // Decode all frames
+    const allFrameCanvases = [];
 
-    if (frameCount === 0xFFFE) {
-        // Type 2 compression
-        lines.push('(Type 2 compression)');
-        const t2Off = offset + 16;
-        if (t2Off + 24 <= buffer.byteLength) {
+    if (imgType2 !== 0xFFFE) {
+        // =====================================================================
+        // Type 1: Delta compression
+        // imgType2 = number of delta frames after the first uncompressed frame
+        // =====================================================================
+        lines.push('');
+        lines.push(`--- Type 1 (Delta) ---`);
+        lines.push(`Delta frame count: ${imgType2}`);
+
+        // Extended header has unk3/unk4 after imgType2
+        if (compOff + 12 <= buffer.byteLength) {
+            const unk3 = view.getUint16(compOff + 8, true);
+            const unk4 = view.getUint16(compOff + 10, true);
+            lines.push(`unk3:            ${hex16(unk3)}`);
+            lines.push(`unk4:            ${hex16(unk4)}`);
+        }
+
+        // Offset table (imgType2 DWord entries) sits between header and firstImgOffset
+        const tableStart = offset + 18; // 6 basic + 12 extended
+        if (imgType2 > 0) {
             lines.push('');
-            lines.push('=== Type 2 Sub-Header ===');
-            lines.push(`subImgID:    ${hex16(view.getUint16(t2Off, true))}`);
-            lines.push(`bufWidth:    ${view.getUint16(t2Off + 4, true)}`);
-            lines.push(`bufHeight:   ${view.getUint16(t2Off + 6, true)}`);
-            lines.push(`numImgs:     ${view.getUint16(t2Off + 8, true)}`);
-            lines.push(`currImgIdx:  ${view.getUint16(t2Off + 10, true)}`);
-            lines.push(`currImgSize: ${view.getUint32(t2Off + 12, true)}`);
+            lines.push('Delta frame offset table:');
+            for (let i = 0; i < imgType2 && tableStart + (i + 1) * 4 <= buffer.byteLength; i++) {
+                const frameOff = view.getUint32(tableStart + i * 4, true);
+                lines.push(`  [${i}] ${hex32(frameOff)}`);
+            }
+        }
 
-            const subW = view.getUint16(t2Off + 18, true) || width;
-            const subH = view.getUint16(t2Off + 22, true) || height;
-            lines.push(`width:       ${subW}`);
-            lines.push(`height:      ${subH}`);
+        // Base frame: uncompressed at offset + firstImgOffset, skip 6-byte sub-header
+        const n = width * height;
+        const pixelStart = offset + firstImgOffset + 6;
+        if (pixelStart + n > buffer.byteLength) throw new Error('Not enough data for base frame pixels.');
 
-            renderWidth = subW;
-            renderHeight = subH;
+        const rawImg = new Uint8Array(n);
+        rawImg.set(new Uint8Array(buffer, pixelStart, n));
+        allFrameCanvases.push(palettizeToCanvas(rawImg, width, height, pal));
 
-            // Type 2 RLE decompression
-            const n = subW * subH;
-            const out = new Uint8Array(n);
-            let pos = 0, p = t2Off + 24;
-            while (pos < n && p < buffer.byteLength) {
-                const b = view.getUint8(p); p++;
-                if (b > 0xF0) {
-                    const count = b & 0x0F;
+        // Decode delta frames sequentially
+        let p = pixelStart + n;
+        for (let j = 0; j < imgType2; j++) {
+            let finished = false;
+            let pos = 0;
+
+            while (p < buffer.byteLength) {
+                const code = view.getUint8(p); p++;
+
+                if (code === 0) {
                     if (p >= buffer.byteLength) break;
-                    const val = view.getUint8(p); p++;
-                    for (let i = 0; i < count && pos < n; i++) out[pos++] = val;
-                } else {
-                    out[pos++] = b;
+                    const count = view.getUint8(p); p++;
+                    if (count === 0) { finished = true; break; }
+                    if (p >= buffer.byteLength) break;
+                    const value = view.getUint8(p); p++;
+                    for (let k = 0; k < count && pos + k < n; k++) rawImg[pos + k] = value;
+                    pos += count;
+                } else if (code > 0x80) {
+                    pos += (code & 0x7F);
+                } else if (code < 0x80) {
+                    for (let k = 0; k < code && p < buffer.byteLength; k++) {
+                        if (pos + k < n) rawImg[pos + k] = view.getUint8(p);
+                        p++;
+                    }
+                    pos += code;
+                } else { // code === 0x80
+                    if (p + 2 > buffer.byteLength) break;
+                    let codeWord = view.getUint16(p, true); p += 2;
+                    if (codeWord === 0) break;
+                    if (codeWord & 0x8000) {
+                        codeWord &= 0x3FFF;
+                        if (p >= buffer.byteLength) break;
+                        const value = view.getUint8(p); p++;
+                        if (value === 0) {
+                            for (let k = 0; k < codeWord && pos + k < n; k++) rawImg[pos + k] = 0;
+                        } else {
+                            break; // edge case (see roth-editor DEMO1/588:ANICE3 note)
+                        }
+                    }
+                    pos += codeWord;
                 }
             }
-            pixels = out;
+
+            if (finished) break;
+            allFrameCanvases.push(palettizeToCanvas(rawImg, width, height, pal));
         }
+
+        lines.push('');
+        lines.push(`Decoded ${allFrameCanvases.length} frame(s) (1 base + ${allFrameCanvases.length - 1} delta)`);
+
     } else {
-        // Type 1: first frame is uncompressed at offset + firstImgOffset
-        const frameStart = compOff + firstImgOffset;
-        const n = width * height;
+        // =====================================================================
+        // Type 2: RLE with sub-image headers (0xFFFE)
+        // Each frame has a 24-byte header followed by RLE pixel data
+        // =====================================================================
+        lines.push('');
+        lines.push('--- Type 2 (RLE Sub-Images) ---');
 
-        if (frameStart + n <= buffer.byteLength) {
-            pixels = new Uint8Array(buffer, frameStart, n);
+        let blockStart = offset + 16;
+
+        for (let frameIdx = 0; frameIdx < 256; frameIdx++) {
+            if (blockStart + 24 > buffer.byteLength) break;
+
+            const subImgId   = view.getUint16(blockStart, true);
+            const subUnk     = view.getUint16(blockStart + 2, true);
+            const bufWidth   = view.getUint16(blockStart + 4, true);
+            const bufHeight  = view.getUint16(blockStart + 6, true);
+            const numImgs    = view.getUint16(blockStart + 8, true);
+            const currImgIdx = view.getUint16(blockStart + 10, true);
+            const currImgSize = view.getUint32(blockStart + 12, true);
+            const subUnk2    = view.getUint16(blockStart + 16, true);
+            const subWidth   = view.getUint16(blockStart + 18, true);
+            const subUnk4    = view.getUint16(blockStart + 20, true);
+            const subHeight  = view.getUint16(blockStart + 22, true);
+
+            if (subWidth <= 0 || subHeight <= 0) break;
+
+            if (frameIdx === 0) {
+                lines.push(`numImgs:         ${numImgs}`);
+                lines.push(`sub dimensions:  ${subWidth}x${subHeight}`);
+                lines.push(`buf dimensions:  ${bufWidth}x${bufHeight}`);
+                lines.push(`subImgID:        ${hex16(subImgId)}`);
+            }
+
+            // RLE decompress
+            const imgSize = subWidth * subHeight;
+            const imgBuffer = new Uint8Array(imgSize);
+            let pos = 0;
+            let rp = blockStart + 24;
+
+            while (pos < imgSize && rp < buffer.byteLength) {
+                const byte = view.getUint8(rp); rp++;
+                if (byte > 0xF0) {
+                    const count = byte & 0x0F;
+                    if (rp >= buffer.byteLength) break;
+                    const nextByte = view.getUint8(rp); rp++;
+                    for (let j = 0; j < count && pos + j < imgSize; j++) imgBuffer[pos + j] = nextByte;
+                    pos += count;
+                } else {
+                    imgBuffer[pos] = byte;
+                    pos += 1;
+                }
+            }
+
+            allFrameCanvases.push(palettizeToCanvas(imgBuffer, subWidth, subHeight, pal));
+
+            blockStart += currImgSize;
+            if (frameIdx + 1 >= numImgs) break;
+        }
+
+        lines.push(`Decoded ${allFrameCanvases.length} RLE frame(s)`);
+    }
+
+    if (allFrameCanvases.length === 0) throw new Error('No frames decoded.');
+
+    const frameW = allFrameCanvases[0].width;
+    const frameH = allFrameCanvases[0].height;
+
+    // =====================================================================
+    // Animation UI
+    // =====================================================================
+
+    // Main display canvas
+    const scale = Math.max(1, Math.min(8, Math.floor(Math.min(512 / frameW, 512 / frameH))));
+    const displayCanvas = document.createElement('canvas');
+    displayCanvas.width = frameW * scale;
+    displayCanvas.height = frameH * scale;
+    displayCanvas.style.imageRendering = 'pixelated';
+    displayCanvas.style.border = '1px solid var(--border)';
+    displayCanvas.style.borderRadius = '6px';
+    displayCanvas.style.display = 'block';
+    container.appendChild(displayCanvas);
+
+    const displayCtx = displayCanvas.getContext('2d');
+    displayCtx.imageSmoothingEnabled = false;
+
+    let currentFrame = 0;
+    let playing = false;
+    let fps = 10;
+
+    function showFrame(idx) {
+        currentFrame = Math.max(0, Math.min(idx, allFrameCanvases.length - 1));
+        displayCtx.clearRect(0, 0, displayCanvas.width, displayCanvas.height);
+        displayCtx.drawImage(allFrameCanvases[currentFrame], 0, 0, displayCanvas.width, displayCanvas.height);
+        frameLabel.textContent = `Frame ${currentFrame + 1} / ${allFrameCanvases.length}`;
+        // Highlight active thumbnail
+        thumbs.forEach((t, i) => {
+            t.style.outline = (i === currentFrame) ? '2px solid var(--accent)' : '1px solid var(--border)';
+        });
+    }
+
+    function togglePlay() {
+        playing = !playing;
+        playBtn.textContent = playing ? 'Pause' : 'Play';
+        if (playing) {
+            compressedAnimTimer = setInterval(() => {
+                showFrame((currentFrame + 1) % allFrameCanvases.length);
+            }, 1000 / fps);
         } else {
-            // Try RLE decompression
-            pixels = tryRLEDecompress(view, frameStart, n, buffer.byteLength);
+            if (compressedAnimTimer) { clearInterval(compressedAnimTimer); compressedAnimTimer = null; }
         }
     }
 
-    if (!pixels) throw new Error('Failed to decompress image data.');
+    // Controls bar
+    const controls = document.createElement('div');
+    controls.className = 'flex';
+    controls.style.marginTop = '8px';
+    controls.style.gap = '6px';
 
-    // Render to canvas
-    const canvas = document.createElement('canvas');
-    const scale = Math.max(1, Math.min(8, Math.floor(Math.min(512 / renderWidth, 512 / renderHeight))));
-    canvas.width = renderWidth * scale;
-    canvas.height = renderHeight * scale;
-    canvas.style.imageRendering = 'pixelated';
+    const playBtn = document.createElement('button');
+    playBtn.className = 'small';
+    playBtn.textContent = 'Play';
+    playBtn.onclick = togglePlay;
 
-    const ctx = canvas.getContext('2d');
-    const img = ctx.createImageData(renderWidth, renderHeight);
-    const pixelCount = renderWidth * renderHeight;
-    for (let i = 0; i < pixelCount; i++) {
-        const idx = (pixels[i] || 0) & 0xFF;
-        const c = pal[idx] || { r: 0, g: 0, b: 0 };
-        img.data[i * 4] = c.r;
-        img.data[i * 4 + 1] = c.g;
-        img.data[i * 4 + 2] = c.b;
-        img.data[i * 4 + 3] = idx === 0 ? 0 : 255;
+    const prevBtn = document.createElement('button');
+    prevBtn.className = 'small';
+    prevBtn.textContent = '< Prev';
+    prevBtn.onclick = () => { if (playing) togglePlay(); showFrame(currentFrame - 1); };
+
+    const nextBtn = document.createElement('button');
+    nextBtn.className = 'small';
+    nextBtn.textContent = 'Next >';
+    nextBtn.onclick = () => { if (playing) togglePlay(); showFrame(currentFrame + 1); };
+
+    const frameLabel = document.createElement('span');
+    frameLabel.className = 'small muted';
+    frameLabel.style.minWidth = '100px';
+
+    const fpsLabel = document.createElement('span');
+    fpsLabel.className = 'small muted';
+    fpsLabel.textContent = 'FPS:';
+
+    const fpsInput = document.createElement('input');
+    fpsInput.type = 'number';
+    fpsInput.min = '1';
+    fpsInput.max = '60';
+    fpsInput.value = '10';
+    fpsInput.style.width = '55px';
+    fpsInput.onchange = () => {
+        fps = Math.max(1, Math.min(60, parseInt(fpsInput.value) || 10));
+        if (playing) {
+            if (compressedAnimTimer) clearInterval(compressedAnimTimer);
+            compressedAnimTimer = setInterval(() => {
+                showFrame((currentFrame + 1) % allFrameCanvases.length);
+            }, 1000 / fps);
+        }
+    };
+
+    controls.append(playBtn, prevBtn, nextBtn, frameLabel, fpsLabel, fpsInput);
+    container.appendChild(controls);
+
+    // Frame strip (thumbnails)
+    const strip = document.createElement('div');
+    strip.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px;margin-top:10px;align-items:flex-start;';
+
+    const thumbScale = Math.max(1, Math.min(3, Math.floor(Math.min(80 / frameW, 80 / frameH))));
+    const thumbs = [];
+
+    for (let i = 0; i < allFrameCanvases.length; i++) {
+        const thumb = document.createElement('canvas');
+        thumb.width = frameW * thumbScale;
+        thumb.height = frameH * thumbScale;
+        thumb.style.cssText = 'image-rendering:pixelated;cursor:pointer;border-radius:3px;';
+        thumb.style.outline = '1px solid var(--border)';
+        const tctx = thumb.getContext('2d');
+        tctx.imageSmoothingEnabled = false;
+        tctx.drawImage(allFrameCanvases[i], 0, 0, thumb.width, thumb.height);
+        thumb.title = `Frame ${i + 1}`;
+        thumb.onclick = ((idx) => () => { if (playing) togglePlay(); showFrame(idx); })(i);
+        thumbs.push(thumb);
+
+        const wrapper = document.createElement('div');
+        wrapper.style.textAlign = 'center';
+        wrapper.appendChild(thumb);
+        const lbl = document.createElement('div');
+        lbl.className = 'small muted';
+        lbl.textContent = `${i + 1}`;
+        wrapper.appendChild(lbl);
+        strip.appendChild(wrapper);
     }
 
-    const tmp = document.createElement('canvas');
-    tmp.width = renderWidth; tmp.height = renderHeight;
-    tmp.getContext('2d').putImageData(img, 0, 0);
-    ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(tmp, 0, 0, renderWidth * scale, renderHeight * scale);
+    container.appendChild(strip);
 
-    container.appendChild(canvas);
+    // Show first frame
+    showFrame(0);
+
+    // Auto-play if multiple frames
+    if (allFrameCanvases.length > 1) togglePlay();
+
     lines.push('');
-    lines.push(`First frame rendered (${renderWidth}x${renderHeight})`);
+    lines.push(`Rendered ${allFrameCanvases.length} frame(s) at ${frameW}x${frameH}`);
 
     infoEl.textContent = lines.join('\n');
     infoEl.classList.remove('hidden');
 });
-
-function tryRLEDecompress(view, startOffset, maxPixels, bufLen) {
-    const out = new Uint8Array(maxPixels);
-    let pos = 0, p = startOffset;
-    for (let guard = 0; guard < maxPixels * 8 && pos < maxPixels && p < bufLen; guard++) {
-        const code = view.getUint8(p); p++;
-        if (code === 0) {
-            if (p >= bufLen) break;
-            const count = view.getUint8(p); p++;
-            if (count === 0) break;
-            if (p >= bufLen) break;
-            const value = view.getUint8(p); p++;
-            for (let i = 0; i < count && pos < maxPixels; i++) out[pos++] = value;
-        } else if (code > 0x80) {
-            pos = Math.min(maxPixels, pos + (code & 0x7F));
-        } else if (code < 0x80) {
-            for (let i = 0; i < code && pos < maxPixels && p < bufLen; i++) {
-                out[pos++] = view.getUint8(p); p++;
-            }
-        } else {
-            if (p + 2 > bufLen) break;
-            const codeWord = view.getUint16(p, true); p += 2;
-            if (codeWord === 0) break;
-            if (codeWord & 0x8000) {
-                const n = codeWord & 0x3FFF;
-                if (p >= bufLen) break;
-                const value = view.getUint8(p); p++;
-                for (let i = 0; i < n && pos < maxPixels; i++) out[pos++] = value;
-            } else {
-                pos = Math.min(maxPixels, pos + codeWord);
-            }
-        }
-    }
-    return out;
-}
 
 // =============================================================================
 // TEXTURE PACK PARSER (for unk_flags == 0x40 / 3D object texture entries)
