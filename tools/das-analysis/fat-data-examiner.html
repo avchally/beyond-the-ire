@@ -1184,6 +1184,9 @@ registerRenderer('COMPRESSED', 'Compressed Image (Delta/RLE)', function(containe
 
     // Decode all frames
     const allFrameCanvases = [];
+    // Display dimensions: the max buffer size frames render into
+    let displayW = width;
+    let displayH = height;
 
     if (imgType2 !== 0xFFFE) {
         // =====================================================================
@@ -1300,6 +1303,11 @@ registerRenderer('COMPRESSED', 'Compressed Image (Delta/RLE)', function(containe
             if (subWidth <= 0 || subHeight <= 0) break;
 
             if (frameIdx === 0) {
+                // Use buffer dimensions as display size (max frame extent)
+                if (bufWidth > 0 && bufHeight > 0) {
+                    displayW = bufWidth;
+                    displayH = bufHeight;
+                }
                 lines.push(`numImgs:         ${numImgs}`);
                 lines.push(`sub dimensions:  ${subWidth}x${subHeight}`);
                 lines.push(`buf dimensions:  ${bufWidth}x${bufHeight}`);
@@ -1337,18 +1345,15 @@ registerRenderer('COMPRESSED', 'Compressed Image (Delta/RLE)', function(containe
 
     if (allFrameCanvases.length === 0) throw new Error('No frames decoded.');
 
-    const frameW = allFrameCanvases[0].width;
-    const frameH = allFrameCanvases[0].height;
-
     // =====================================================================
     // Animation UI
     // =====================================================================
 
-    // Main display canvas
-    const scale = Math.max(1, Math.min(8, Math.floor(Math.min(512 / frameW, 512 / frameH))));
+    // Main display canvas uses buffer dimensions (max extent of any frame)
+    const scale = Math.max(1, Math.min(8, Math.floor(Math.min(512 / displayW, 512 / displayH))));
     const displayCanvas = document.createElement('canvas');
-    displayCanvas.width = frameW * scale;
-    displayCanvas.height = frameH * scale;
+    displayCanvas.width = displayW * scale;
+    displayCanvas.height = displayH * scale;
     displayCanvas.style.imageRendering = 'pixelated';
     displayCanvas.style.border = '1px solid var(--border)';
     displayCanvas.style.borderRadius = '6px';
@@ -1365,7 +1370,9 @@ registerRenderer('COMPRESSED', 'Compressed Image (Delta/RLE)', function(containe
     function showFrame(idx) {
         currentFrame = Math.max(0, Math.min(idx, allFrameCanvases.length - 1));
         displayCtx.clearRect(0, 0, displayCanvas.width, displayCanvas.height);
-        displayCtx.drawImage(allFrameCanvases[currentFrame], 0, 0, displayCanvas.width, displayCanvas.height);
+        const fc = allFrameCanvases[currentFrame];
+        // Draw at scaled native size (frame may be smaller than buffer dimensions)
+        displayCtx.drawImage(fc, 0, 0, fc.width * scale, fc.height * scale);
         frameLabel.textContent = `Frame ${currentFrame + 1} / ${allFrameCanvases.length}`;
         // Highlight active thumbnail
         thumbs.forEach((t, i) => {
@@ -1437,18 +1444,19 @@ registerRenderer('COMPRESSED', 'Compressed Image (Delta/RLE)', function(containe
     const strip = document.createElement('div');
     strip.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px;margin-top:10px;align-items:flex-start;';
 
-    const thumbScale = Math.max(1, Math.min(3, Math.floor(Math.min(80 / frameW, 80 / frameH))));
+    const thumbScale = Math.max(1, Math.min(3, Math.floor(Math.min(80 / displayW, 80 / displayH))));
     const thumbs = [];
 
     for (let i = 0; i < allFrameCanvases.length; i++) {
         const thumb = document.createElement('canvas');
-        thumb.width = frameW * thumbScale;
-        thumb.height = frameH * thumbScale;
+        thumb.width = displayW * thumbScale;
+        thumb.height = displayH * thumbScale;
         thumb.style.cssText = 'image-rendering:pixelated;cursor:pointer;border-radius:3px;';
         thumb.style.outline = '1px solid var(--border)';
         const tctx = thumb.getContext('2d');
         tctx.imageSmoothingEnabled = false;
-        tctx.drawImage(allFrameCanvases[i], 0, 0, thumb.width, thumb.height);
+        const fc = allFrameCanvases[i];
+        tctx.drawImage(fc, 0, 0, fc.width * thumbScale, fc.height * thumbScale);
         thumb.title = `Frame ${i + 1}`;
         thumb.onclick = ((idx) => () => { if (playing) togglePlay(); showFrame(idx); })(i);
         thumbs.push(thumb);
@@ -1472,7 +1480,7 @@ registerRenderer('COMPRESSED', 'Compressed Image (Delta/RLE)', function(containe
     if (allFrameCanvases.length > 1) togglePlay();
 
     lines.push('');
-    lines.push(`Rendered ${allFrameCanvases.length} frame(s) at ${frameW}x${frameH}`);
+    lines.push(`Rendered ${allFrameCanvases.length} frame(s), display: ${displayW}x${displayH}`);
 
     infoEl.textContent = lines.join('\n');
     infoEl.classList.remove('hidden');
