@@ -270,7 +270,7 @@ let obj3d = null;
 let obj3dAnimTimer = null;
 let yaw3d = -0.4, pitch3d = 0.3;
 let dragging3d = false, lastMX = 0, lastMY = 0;
-let center3d = {x:0, y:0, z:0}, fitRadius3d = 1;
+let center3d = {x:0, y:0, z:0}, fitRadius3d = 1, zoom3d = 1;
 
 // =============================================================================
 // UTILITIES
@@ -1722,7 +1722,7 @@ function resolveTextureForFace(face, dasFile, pal) {
         const ctx = canvas.getContext('2d');
         ctx.fillStyle = `rgb(${c.r},${c.g},${c.b})`;
         ctx.fillRect(0, 0, 1, 1);
-        return { canvas, width: 1, height: 1, info: `palette[${palIdx}] rgb(${c.r},${c.g},${c.b})` };
+        return { canvas, width: 1, height: 1, isPalette: true, info: `palette[${palIdx}] rgb(${c.r},${c.g},${c.b})` };
     }
 
     // Find the FAT entry
@@ -1960,7 +1960,7 @@ registerRenderer('OBJECT_3D', '3D Object (Textured)', function(container, infoEl
 
     const version = view.getUint32(pos, true); pos += 4;
     const versionPadding = view.getUint16(pos, true); pos += 2;
-    const faceSectionSize = view.getUint16(pos, true); pos += 2;
+    const faceSectionSize = view.getUint16(pos, false); pos += 2; // big-endian
 
     // Parse faces
     const faces = [];
@@ -2033,6 +2033,7 @@ registerRenderer('OBJECT_3D', '3D Object (Textured)', function(container, infoEl
         let texInfo = null;
         if (resolved && resolved.canvas) {
             texInfo = { canvas: resolved.canvas, width: resolved.width, height: resolved.height };
+            if (resolved.isPalette) texInfo.isPalette = true;
             if (resolved.compressed) texInfo.compressed = true;
             if (resolved.frames && resolved.frames.length > 1) {
                 texInfo.frames = resolved.frames;
@@ -2126,7 +2127,7 @@ registerRenderer('OBJECT_3D', '3D Object (Textured)', function(container, infoEl
     }
 
     // Setup interaction
-    yaw3d = -0.4; pitch3d = 0.3;
+    yaw3d = -0.4; pitch3d = 0.3; zoom3d = 1;
     recalcBounds3D();
 
     canvas.addEventListener('mousedown', e => { dragging3d = true; lastMX = e.clientX; lastMY = e.clientY; });
@@ -2139,6 +2140,12 @@ registerRenderer('OBJECT_3D', '3D Object (Textured)', function(container, infoEl
         lastMX = e.clientX; lastMY = e.clientY;
         render3DCanvas();
     });
+    canvas.addEventListener('wheel', e => {
+        e.preventDefault();
+        zoom3d *= e.deltaY > 0 ? 0.9 : 1.1;
+        zoom3d = Math.max(0.1, Math.min(20, zoom3d));
+        render3DCanvas();
+    }, { passive: false });
 
     const projSel = document.getElementById('projMode3d');
     const fillCb = document.getElementById('fillFaces3d');
@@ -2407,10 +2414,10 @@ function project3D(p, canvas) {
     const cx = canvas.width/2, cy = canvas.height/2, minDim = Math.min(canvas.width, canvas.height);
     const projMode = document.getElementById('projMode3d');
     if (projMode && projMode.value === 'orthographic') {
-        const s = (minDim * 0.38) / fitRadius3d;
+        const s = (minDim * 0.38 * zoom3d) / fitRadius3d;
         return { x: cx + p.x*s, y: cy - p.y*s };
     }
-    const camDist = fitRadius3d * 4;
+    const camDist = fitRadius3d * 4 / zoom3d;
     const focal = minDim * 1.3;
     const zCam = p.z + camDist;
     const persp = focal / Math.max(1, zCam);
@@ -2463,18 +2470,21 @@ function render3DCanvas() {
         const validIndices = face.edgeArray.filter(i => i >= 0 && i < projected.length);
         if (validIndices.length < 3) continue;
 
-        // Bit 3 of render_flag = visible; skip if not set
-        if ((face.render_flag & 0x08) === 0) continue;
+        const texInfo = (showTex && obj3d.faceTextures) ? obj3d.faceTextures[fi] : null;
+        const isPalette = texInfo && texInfo.isPalette;
+
+        // Bit 3 of render_flag = visible; skip if not set (only for real textures, not palette colors)
+        if (!isPalette && (face.render_flag & 0x08) === 0) continue;
 
         // Textured rendering
-        if (showTex && obj3d.faceTextures && obj3d.faceTextures[fi]) {
-            const texInfo = obj3d.faceTextures[fi];
+        if (texInfo) {
             // Pick the current animation frame if this is an animated texture
             const texCanvas = (texInfo.frames && texInfo.frames.length > 1)
                 ? texInfo.frames[obj3d.animFrame % texInfo.frames.length]
                 : texInfo.canvas;
-            const mirrorFlag = (face.render_flag & 0x02) !== 0; // bit 1 = mirror Y-axis
-            const mirrorY = texInfo.compressed ? !mirrorFlag : mirrorFlag; // compressed textures have inverted mirror
+            // Render flags only apply to real textures, not palette colors
+            const mirrorFlag = !isPalette && (face.render_flag & 0x02) !== 0;
+            const mirrorY = isPalette ? false : (texInfo.compressed ? mirrorFlag : !mirrorFlag);
             let uvs = computeFaceUVs(obj3d.vertices, face.edgeArray, texInfo.width, texInfo.height);
 
             // Apply mirror: flip U coordinates
