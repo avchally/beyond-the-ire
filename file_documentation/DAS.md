@@ -1,10 +1,38 @@
-# .DAS File Format
+# .DAS File Format (WIP)
 
 ## Overview
 
 DAS files are texture archives containing collections of textures including floors, ceilings, walls, skyboxes, in-game objects, enemies, projectiles, and items.
 
 The DAS format supports multiple image types, compression schemes, and animation sequences.
+
+Although the same file format, ADEMO.DAS differs slightly than the other *.DAS files. Since ADEMO is accessible by every map (defined by ROTH.RES), it contains game-wide object mapping information (such as inventory items and enemies). I will attempt to document which sections are only present or only missing in ADEMO.
+
+## General File Structure
+
+The large majority of the file is made up of sections relating to object/image data entities, loosely inspired by a File Allocation Format. Here we will nevertheless refer to these data blocks as FAT (File Allocation Table) Data Blocks for consistency with previous reverse-engineering attempts/documentation.  
+
+
+```
+DAS File Structure (WIP):
+├── Header (68 bytes)
+├── File Allocation Table
+├── Palette Data (optional)
+├── Unk_0x10 Section
+├── FAT Data Blocks (bulk of the file)
+├── Unk_0x1C Section
+├── Unk_0x24 Section
+├── Monster Mapping Section
+├── Unk_0x38 Section (small, found in ADEMO)
+├── Unk_0x40 Section (small, found in ADEMO)
+└── Filename Block
+```
+
+## To investigate (TODO)
+- Small section after CHAND2 in DEMO.DAS
+- Partial transparency (potions, crystal texture)
+- Section that the index of bullets refer to
+- Why some 3D Objects are only 8 bytes in size (maybe a reference to something in ADEMO?)
 
 
 ## Main Header (68 bytes)
@@ -13,36 +41,228 @@ The DAS file header contains metadata about the file structure and offsets to va
 
 | Offset | Size | Field Name | Description |
 |--------|------|------------|-------------|
-| 0x00 | 4 | DAS_id_str | File signature: "DASP" |
-| 0x04 | 2 | DAS_id_num | Always 5 |
-| 0x06 | 2 | size_FAT | Total size of both FATs combined |
-| 0x08 | 4 | img_FAT_offset | Offset to image FAT (usually 0x44) |
-| 0x0C | 4 | palette_offset | Palette offset (0 = use ADEMO.DAS palette) |
-| 0x10 | 4 | unk_0x10 | Unknown field |
-| 0x14 | 4 | file_names_section | Offset to filename section |
-| 0x18 | 2 | file_names_section_size | Size of filename section |
-| 0x1A | 2 | unk_0x1C_size | Size of data at unk_0x1C |
-| 0x1C | 4 | unk_0x1C | Unknown offset |
-| 0x20 | 4 | unk_0x20 | Unknown field |
-| 0x24 | 4 | unk_0x24 | Unknown FAT offset |
-| 0x28 | 4 | monster_mapping_section | Offset to the section for mapping animations to monsters |
-| 0x2C | 4 | monster_mapping_section_size | Size of monster_mapping_section |
-| 0x30 | 4 | unk_0x30 | Unknown field |
-| 0x34 | 2 | img_FAT_block1_count | Number of entries in primary image FAT |
-| 0x36 | 2 | img_FAT_block2_count | Number of entries in secondary image FAT |
-| 0x38 | 4 | unk_0x38 | Unknown field |
-| 0x3C | 2 | unk_0x38_size | Size related to unk_0x38 |
-| 0x3E | 2 | unk_0x40_size | Size related to unk_0x40 |
-| 0x40 | 4 | unk_0x40 | Unknown offset |
+| 0x00 | 4 | DAS_ID_STR | File signature: "DASP" |
+| 0x04 | 2 | DAS_ID_NUM | Always 5 |
+| 0x06 | 2 | SIZE_FAT | Total size of both FATs combined |
+| 0x08 | 4 | IMG_FAT_OFFSET | Offset to image FAT (usually 0x44) |
+| 0x0C | 4 | PALETTE_OFFSET | Palette offset (0 = use ADEMO.DAS palette) |
+| 0x10 | 4 | UNK_0x10_SECTION_OFFSET | Offset to Unk_0x10 Section |
+| 0x14 | 4 | FILE_NAMES_SECTION | Offset to filename section |
+| 0x18 | 2 | FILE_NAMES_SECTION_SIZE | Size of filename section |
+| 0x1A | 2 | UNK_0x1C_SIZE | Size of Unk_0x1C Section |
+| 0x1C | 4 | UNK_0x1C_SECTION_OFFSET | Offset to Unk_0x1C Section |
+| 0x20 | 4 | UNK_0x20 | Unknown field |
+| 0x24 | 4 | UNK_0x24 | Unknown FAT offset |
+| 0x28 | 4 | MONSTER_MAPPING_SECTION | Offset to the section for mapping animations to monsters |
+| 0x2C | 4 | MONSTER_MAPPING_SECTION_SIZE | Size of MONSTER_MAPPING_SECTION |
+| 0x30 | 4 | UNK_0x30 | Unknown field |
+| 0x34 | 2 | IMG_FAT_BLOCK1_COUNT | Number of entries in primary image FAT |
+| 0x36 | 2 | IMG_FAT_BLOCK2_COUNT | Number of entries in secondary image FAT |
+| 0x38 | 4 | UNK_0x38 | Unknown field |
+| 0x3C | 2 | UNK_0x38_SIZE | Size related to unk_0x38 |
+| 0x3E | 2 | UNK_0x40_SIZE | Size related to unk_0x40 |
+| 0x40 | 4 | UNK_0x40 | Unknown offset |
 
-## FAT Section
+## File Allocation Table
+
+This section directly follows the header and provides a list of 8 byte elements that point to a FAT Data Block.
 
 | Offset | Size | Field Name | Description |
 |--------|------|------------|-------------|
-| 0x00 | 4 | image_data_offset | absolute offset to the image header |
-| 0x04 | 2 | length_div_2 | byte length divided by 2 |
-| 0x06 | 1 | type | Flags or type. (0x24 is monster) |
-| 0x07 | 1 | special_info | when type is 0x24, this is the index within the monster mapping section to apply to the object |
+| 0x00 | 4 | DATA_BLOCK_OFFSET | when image, this is absolute offset to data block within file<br>when enemy, it is an offset in another file (WIP) |
+| 0x04 | 2 | DATE_SIZE_BASE | This value is used to calculate the total size of the data block pointed to by DATA_BLOCK_OFFSET. The standard operation to be done is multiply by 2. In some scenarios, the value must instead be shifted to the left 4 bits (or multiplying it by `0x10`). |
+| 0x06 | 1 | FLAG_1 | Flags or type. (0x24 is monster) |
+| 0x07 | 1 | FLAG_2 | when FLAG_1 is 0x24, this is the index within the monster mapping section to apply to the object |
+
+#### FLAG_1 and FLAG_2 relation
+
+| FLAG_1 | Description | Associated FLAG_2 meaning |
+| ------ | ----------- | -------------- |
+| 0x00 | Texture | `0x00`, `0x10`, `0x11`, `0x80` |
+| 0x02 | Sky texture | `0x00` |
+| 0x08 | | |
+| 0x20 | Bullet (most) | index to ??? |
+| 0x24 | Monster | index within monster mapping section |
+| 0x40 | | |
+| 0x80 | Items | |
+| 0x88 | | |
+
+| FLAG_2 | Description | Associated FLAG_1 meaning |
+| ------ | ----------- | -------------- |
+| 0x80 | 3D Object | `0x00` or `0x10` (pin to ceiling?) |
+
+## FAT Data Blocks Section (WIP)
+
+Each block within the FAT Data Blocks section begins with two bytes of data identifying what structure the data is. 
+
+The majority of the data contained here is image/texture data. 
+
+**Note:** Realms of the Haunting transposes its texture width and height. This means by parsing the raw texture data, all images will be rotated 90 degrees.
+
+The second byte is considered the data block_type and the first byte is considered the block_type_modifier. The naming is likely not completely accurate, because both bytes include type information. Generally, however the block_type is "what is the data and how is it read" and the block_type_modifier is "how does the engine use or place this".
+
+| Offset | Size | Field Name | Description |
+|--------|------|------------|-------------|
+| 0x00 | 1 | BLOCK_TYPE_MODIFIER |  | 
+| 0x01 | 1 | BLOCK_TYPE |  |
+| 0x02 | ~ | DATA_BLOCK_DATA | The remaining data dependent on the BLOCK_TYPE and BLOCK_TYPE_MODIFIER combination |
+
+Here are the main data block types and their associated BLOCK_TYPE and BLOCK_TYPE_MODIFIER:
+
+| Description | BLOCK_TYPE_MODIFIER | BLOCK_TYPE |
+| --- | --- | --- |
+| [Plain Texture](#plain-texture) | `0x80` - `0x9F` | Even-numbered under `0x40` (ex: `0x10`) |
+| Plain Texture Transposed |  |  |
+| [Animated Texture (Compressed)](#animated-texture-compressed) |  | Odd-numbered under `0x40` (ex: `0x11`) |
+| [Directional Billboard Object](#directional-billboard-object) | `0xC0` - `0xDF` |  |
+| [Graphics Folder](#graphics-folder) | `0x40` only |  |
+| [3D Object](#3d-object) |  | `0x80` only |
+
+
+### Data formats for all data block types
+
+#### Plain Texture
+
+| Offset | Size | Field Name | Description |
+|--------|------|------------|-------------|
+| 0x00 | 1 | BLOCK_TYPE_MODIFIER | High nibble is `0x8` or `0x9` (representing this type of object) and the low nibble encodes vertical displacement in the world (not exactly sure on the specifics).<br>When the high nibble is `0x8`, the image's bottom is positioned at the object. When the high nibble is `0x9` the image's top is positioned at the object. | 
+| 0x01 | 1 | BLOCK_TYPE | This is an even value, indicating it is a plain texture (such as `0x10`). Bits 4-6 represent scaling (`0x1*` for standard scaling, `0x2*` for large scaling, and `0x4*` for extra large scaling) |
+| 0x02 | 2 | IMAGE_WIDTH | Number of pixels wide the image is (prior to any transposing) |
+| 0x04 | 2 | IMAGE_HEIGHT | Number of pixels tall the image is (prior to any transposing) |
+| 0x06 | IMAGE_WIDTH<br>* IMAGE_HEIGHT | PIXEL_DATA | Raw pixels in the image. Each byte is an index reference to the palette. 
+
+
+#### Animated Texture (Compressed)
+
+This data block contains animation data and the frames are stored in one of two compression formats: 
+- Delta Compression
+- RLE with Sub-Image Headers
+
+| Offset | Size | Field Name | Description |
+|--------|------|------------|-------------|
+| 0x00 | 1 | BLOCK_TYPE_MODIFIER | The low nibble encodes vertical displacement in the world (not exactly sure on the specifics).<br>When the high nibble is `0x8`, the image's bottom is positioned at the object. When the high nibble is `0x9` the image's top is positioned at the object. | 
+| 0x01 | 1 | BLOCK_TYPE | This is an odd value, indicating it is a compressed animation (such as `0x11`). Bits 4-6 represent scaling (`0x1*` for standard scaling, `0x2*` for large scaling, and `0x4*` for extra large scaling) |
+| 0x02 | 2 | BUFFER_WIDTH | Number of pixels wide the buffer should be |
+| 0x04 | 2 | BUFFER_HEIGHT | Number of pixels tall the buffer should be |
+| 0x06 | 4 | TOTAL_BLOCK_SIZE | Total size of the data block IF Delta Compression, otherwise just `0x00` |
+| 0x0A | 2 | BASE_IMAGE_OFFSET | Offset from data block start to the first image, which is stored as [Plain Data Format](#plain-texture) |
+| 0x0C | 2 | NUM_DELTA_FRAMES | Number of delta frames IF Delta Compression, otherwise `0xFFFE` |
+| 0x0E | ~ | COMPRESSION_DATA | The rest of the data block is dependent on the type of compression that is used |
+
+<b>Delta Compression</b>  
+TODO
+
+<b>RLE with Sub-Image Headers</b>  
+TODO
+
+#### Directional Billboard Object
+
+<b>Summary:</b> The Directional Billboard Object renders an object in the world with billboarding. Depending on the angle the player is in relation to the direction the object is pointing, a different texture will be displayed, simulating a basic 3D object. There are 8 total directions that such an object renders. Direction 1 is the back and incrementing clockwise, with direction 5 being the front.
+
+The data has a header followed by an array of raw texture images.
+
+| Offset | Size | Field Name | Description |
+|--------|------|------------|-------------|
+| 0x00 | 1 | BLOCK_TYPE_MODIFIER | High nibble is `0xC` or `0xD` (representing this type of object) and the low nibble encodes vertical displacement in the world (not exactly sure on the specifics) | 
+| 0x01 | 1 | BLOCK_TYPE | `0x10` for standard scaling, `0x20` for large scaling, and `0x40` for extra large scaling |
+| 0x02 | 2 | MAX_WIDTH | The max width of the textures |
+| 0x04 | 2 | MAX_HEIGHT | The max height of the textures |
+| 0x06 | 2 | UNK_0x08 |  |
+| 0x08 | 2 | DIR_1_IMG_REF | Packed image reference for first direction. Bit 15 is the horizontal mirror flag (1 = flipped). Bits 0-14 store the image data offset in units of 16 bytes. The actual byte offset is (value & `0x7FFF`) << 4, relative to the start of the data block. |
+| 0x0A | 2 | DIR_2_IMG_REF | Same as DIR_1_IMG_REF, but for direction 2 |
+| 0x0C | 2 | DIR_3_IMG_REF | Same as DIR_1_IMG_REF, but for direction 3 |
+| 0x0E | 2 | DIR_4_IMG_REF | Same as DIR_1_IMG_REF, but for direction 4 |
+| 0x10 | 2 | DIR_5_IMG_REF | Same as DIR_1_IMG_REF, but for direction 5 |
+| 0x12 | 2 | DIR_6_IMG_REF | Same as DIR_1_IMG_REF, but for direction 6 |
+| 0x14 | 2 | DIR_7_IMG_REF | Same as DIR_1_IMG_REF, but for direction 7 |
+| 0x16 | 2 | DIR_8_IMG_REF | Same as DIR_1_IMG_REF, but for direction 8 |
+| 0x18 | 8 | PADDING | appears to always be 8 bytes |
+| 0x1E | ~ | IMAGE_DATA_ARRAY | Array of raw pixel data for texture images |
+
+<b>`IMAGE_DATA_ARRAY` Entry</b>  
+The images can take the form of any of the texture formats as listed in [FAT Data Blocks Section](#fat-data-blocks-section-wip). Most common is the [Plain Texture](#plain-texture)
+
+#### Graphics Folder
+
+This special data type contains a grouping of related textures. Most commonly these represent graphics to be applied to a 3D Object. There is a small header which contains modified offsets to each of the contained textures.  
+
+| Offset | Size | Field Name | Description |
+|--------|------|------------|-------------|
+| 0x00 | 1 | BLOCK_TYPE_MODIFIER | `0x40` |
+| 0x01 | 1 | BLOCK_TYPE | either `0x10` or `0x12` TODO |
+| 0x02 | 2 | MAX_WIDTH | The max width of the textures |
+| 0x04 | 2 | MAX_HEIGHT | The max height of the textures |
+| 0x06 | 2 | UNK_0x06 |  |
+| 0x08 | ~ | SHIFTED_IMAGE_OFFSET_ARRAY | This is an array of 2-byte size values representing an offset to each of the contained images. This value must be shifted left 4 bits to get the offset. The offset is relative to the start of the data block.<br>The array is terminated by a 4 byte null value (`00 00 00 00`) and further aligned to 16 bytes. |
+| ~ | ~ | IMAGES | The remainder of the data block is the raw image data. Each image pointed to by the entries in SHIFTED_IMAGE_OFFSET_ARRAY is one of the Plain Texture formats (including the header). Each image is also aligned to 16 bytes. |
+
+#### 3D Object
+
+This data type renders fully meshed 3D objects in the world.
+
+The data object is made up of an array of 3D vertices and then an array of face mapping objects which create a face by referencing 3 or 4 vertices. It's also possible to pin an object texture to a single vertex, although this is only used once in the base game on the object `CHAND2` which is the chandelier in the starting room of the game (map: `STUDY1`).
+
+| Offset | Size | Field Name | Description |
+|--------|------|------------|-------------|
+| 0x00 | 1 | BLOCK_TYPE_MODIFIER | `0x10` or `0x00` |
+| 0x01 | 1 | BLOCK_TYPE | `0x80` |
+| 0x02 | 2 | MAX_BOUND_X | The maximum X distance (in both negative and positive directions) |
+| 0x04 | 2 | MAX_BOUND_Y | The maximum Y distance (in both negative and positive directions) |
+| 0x06 | 2 | UNK_0x06 | Only `0x08` |
+| 0x08 | 2 | UNK_0x08 | Always seems to be the amount of vertices plus or minus a couple |
+| 0x0A | 4 | UNK_0x0A | Only `0x1E` |
+| 0x0E | 2 | MAX_BOUND_Z | The maximum Z distance (in both negative and positive directions) |
+| 0x10 | 4 | UNK_0x10 | Only `0x00` |
+| 0x14 | 2 | NUM_VERTICES | The number of vertices that makes up the 3D object |
+| 0x16 | 0x10 * NUM_VERTICES | VERTICES_ARRAY | An array containing the vertices of type VERTEX that make up the 3D object |
+| 0x16 + (0x10 * NUM_VERTICES) | ~ | FACE_MAPPING_SECTION | The rest of the data block contains information for constructing faces and mapping textures to them |
+
+Here is the format for the VERTEX type. Each vertex is 16 bytes in size.
+| Offset | Size | Field Name | Description |
+|--------|------|------------|-------------|
+| 0x00 | 2 | POS_X | X-coordinate of the vertex |
+| 0x02 | 2 | POS_Y | Y-coordinate of the vertex |
+| 0x04 | 2 | POS_Z | Z-coordinate of the vertex |
+| 0x06 | 0x0A | PADDING | The remaining 10 bytes is padding |
+
+Here is the format for FACE_MAPPING_SECTION:
+| Offset | Size | Field Name | Description |
+|--------|------|------------|-------------|
+| 0x00 | 4 | EXP2 | ASCII string "EXP2" |
+| 0x04 | 2 | UNK_0x04 | Likely padding. Only `0x00` |
+| 0x06 | 2 (big-endian) | FACES_ARRAY_SIZE | Size of the face mapping array in bytes. NOTE: this value is big-endian byte order. |
+| 0x08 | FACES_ARRAY_SIZE | FACES_ARRAY | An array of FACE objects, which determine how to build and map a face on the 3D object |
+
+And below is the format for a FACE.  
+
+<b>Note:</b> the object contains a lot of seemingly really specific rendering information (like altering pixel projections on the face). In most faces, however, it is fairly straightforward how the texture is mapped: by default the texture fills the face and then applies things like mirroring or transparency using the RENDER_FLAG_1 and RENDER_FLAG_2 combination. 
+| Offset | Size | Field Name | Description |
+|--------|------|------------|-------------|
+| 0x00 | 2 | SIZE | The size in bytes of this data element |
+| 0x02 | 4 | UNK_0x02 | Only `0x00` |
+| 0x06 | 2 | UNK_0x06 | Only `0x00` |
+| 0x08 | 2 | UNK_0x08 | `0x00`, `0x08`, or `0x0E` |
+| 0x0A | 2 | UNK_0x0A | `0x00`, `0x03`, or `0x04` |
+| 0x0C | 2 (big-endian) | TEXTURE_FAT_INDEX_BASE | This number is used to calculate the texture index (FAT_INDEX) within the File Allocation Table. That means this is the texture to use on this face. It can either be a [Plain Texture](#plain-texture), [Compressed Animation](#animated-texture-compressed), or a [Graphics Folder](#graphics-folder). It could also be a solid color from the palette if the first byte is `0xFF`. NOTE: this value is big-endian byte order.<br>Most of the time this is just the raw index to the FAT, but when EDGE_COUNT is 0, `0x1000` needs to be added to the value. |
+| 0x0E | 2 | UNK_0x0E | This seems to be some flag. Either `0x00` or `0x80` |
+| 0x10 | 6 | UNK_0x10 | Only `0x00` |
+| 0x16 | 1 | RENDER_FLAG_1 | TODO This is a bit packed flag.<br>0 = transparency (see RENDER_FLAG_2) <br>1 = mirror<br>2 = mirror (when rendered as floor)<br>3 = visible<br>4 = ?<br>5 = render as floor<br>6 = ?<br>7 = ? |
+| 0x17 | 1 | RENDER_FLAG_2 | TODO Maybe another bit packed flag, but not as consistent.<br>`0x00` - automatically transparent and RENDER_FLAG_2 bit 0 has no effect<br>`0x01` - repeating texture<br>`0x02` - mirrored<br>`0x03` - mirrored<br>`0x12` - solid color |
+| 0x18 | 4 | UNK_0x18 |  |
+| 0x1C | 1 | SUB_TEXTURE_INDEX | Which image within a [Graphics Folder](#graphics-folder) to display.<br>Note: the object `CROSS` in the base game (FAT index 4237) seems to use this field in another way, but this object is not used in the game, so this field may have previously had other functionality | 
+| 0x1D | 1 | UNK_0x1D |  |
+| 0x1E | 1 | UNK_0x1E |  |
+| 0x1F | 1 | UNK_0x1F | render-related |
+| 0x20 | 4 | UNK_0x20 | render-related. 3-4 `0xFF` bytes seemingly. This can be modified with UNK_0x1F to  |  |
+| 0x24 | 2 | UNK_0x24 | render-related. Likely another big flag. Bit 0 is never set. |
+| 0x26 | 2 | UNK_0x26 | render-related |
+| 0x28 | 4 | UNK_0x28 | `0x00` except for every face in `CHAIR3` which is `0x01010101` (but this object doesn't render properly, it's likely unfinished or scrapped) |
+| 0x2C | 4 | UNK_0x2C | `0x00` except for every face in `CHAIR3` which is `0xFFFFFFFF` (but this object doesn't render properly, it's likely unfinished or scrapped) |
+| 0x30 | 2 | UNK_0x30 | Only `0x32` |
+| 0x32 | 2 | UNK_0x32 | Only `0x00` |
+| 0x34 | 2 | EDGE_COUNT | How many edges the face should be made up of. The following is an array of vertex indices that make the face. They array must make a closed loop, resulting in the array size being EDGE_COUNT + 1. If EDGE_COUNT is 0, the texture will be pinned and rendered right at the point of the vertex<br>Only values used in base game are `0x00`, `0x03`, and `0x04`. The only time  |
+| 0x36 | (EDGE_COUNT + 1) * 0x02 | EDGE_ARRAY | An array of `0x02` size vertex indices indicating the points that make up the face. Note: the vertex is a little weird, appears to be encoded << 4 (so to reference vertex index 1 the value used is `0x10` not `0x01`) |
+
 
 
 ## Monster Mapping Section
