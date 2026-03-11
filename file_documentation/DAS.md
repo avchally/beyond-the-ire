@@ -254,13 +254,13 @@ And below is the format for a FACE.
 | 0x1E | 1 | UNK_0x1E |  |
 | 0x1F | 1 | UNK_0x1F | render-related |
 | 0x20 | 4 | UNK_0x20 | render-related. 3-4 `0xFF` bytes seemingly. This can be modified with UNK_0x1F to  |  |
-| 0x24 | 2 | UNK_0x24 | render-related. Likely another big flag. Bit 0 is never set. |
+| 0x24 | 2 | UNK_0x24 | render-related. Likely another bit flag. Bit 0 is never set. |
 | 0x26 | 2 | UNK_0x26 | render-related |
 | 0x28 | 4 | UNK_0x28 | `0x00` except for every face in `CHAIR3` which is `0x01010101` (but this object doesn't render properly, it's likely unfinished or scrapped) |
 | 0x2C | 4 | UNK_0x2C | `0x00` except for every face in `CHAIR3` which is `0xFFFFFFFF` (but this object doesn't render properly, it's likely unfinished or scrapped) |
 | 0x30 | 2 | UNK_0x30 | Only `0x32` |
 | 0x32 | 2 | UNK_0x32 | Only `0x00` |
-| 0x34 | 2 | EDGE_COUNT | How many edges the face should be made up of. The following is an array of vertex indices that make the face. They array must make a closed loop, resulting in the array size being EDGE_COUNT + 1. If EDGE_COUNT is 0, the texture will be pinned and rendered right at the point of the vertex<br>Only values used in base game are `0x00`, `0x03`, and `0x04`. The only time  |
+| 0x34 | 2 | EDGE_COUNT | How many edges the face should be made up of. The following is an array of vertex indices that make the face. The vertices must make a closed loop, resulting in the array size being EDGE_COUNT + 1. If EDGE_COUNT is 0, the texture will be pinned and rendered right at the point of the vertex<br>Only values used in base game are `0x00`, `0x03`, and `0x04`. The only time  |
 | 0x36 | (EDGE_COUNT + 1) * 0x02 | EDGE_ARRAY | An array of `0x02` size vertex indices indicating the points that make up the face. Note: the vertex is a little weird, appears to be encoded << 4 (so to reference vertex index 1 the value used is `0x10` not `0x01`) |
 
 
