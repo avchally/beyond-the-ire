@@ -1886,11 +1886,21 @@ function drawTexturedTriangle(ctx, texCanvas, x0, y0, u0, v0, x1, y1, u1, v1, x2
     const e = (x0 * (u1 * v2 - u2 * v1) + x1 * (u2 * v0 - u0 * v2) + x2 * (u0 * v1 - u1 * v0)) / det;
     const f = (y0 * (u1 * v2 - u2 * v1) + y1 * (u2 * v0 - u0 * v2) + y2 * (u0 * v1 - u1 * v0)) / det;
 
+    // Expand clip triangle slightly outward from centroid to hide seam lines
+    const cx = (x0 + x1 + x2) / 3, cy = (y0 + y1 + y2) / 3;
+    const expand = 0.6;
+    const ex0 = x0 + (x0 - cx) * expand / Math.hypot(x0 - cx, y0 - cy || 1);
+    const ey0 = y0 + (y0 - cy) * expand / Math.hypot(x0 - cx, y0 - cy || 1);
+    const ex1 = x1 + (x1 - cx) * expand / Math.hypot(x1 - cx, y1 - cy || 1);
+    const ey1 = y1 + (y1 - cy) * expand / Math.hypot(x1 - cx, y1 - cy || 1);
+    const ex2 = x2 + (x2 - cx) * expand / Math.hypot(x2 - cx, y2 - cy || 1);
+    const ey2 = y2 + (y2 - cy) * expand / Math.hypot(x2 - cx, y2 - cy || 1);
+
     ctx.save();
     ctx.beginPath();
-    ctx.moveTo(x0, y0);
-    ctx.lineTo(x1, y1);
-    ctx.lineTo(x2, y2);
+    ctx.moveTo(ex0, ey0);
+    ctx.lineTo(ex1, ey1);
+    ctx.lineTo(ex2, ey2);
     ctx.closePath();
     ctx.clip();
     ctx.setTransform(a, b, c, d, e, f);
@@ -2382,6 +2392,134 @@ registerRenderer('DIRECTIONAL_BILLBOARD', 'Directional Billboard Object', functi
 });
 
 // =============================================================================
+// RENDERER: GRAPHICS_FOLDER
+// =============================================================================
+
+registerRenderer('GRAPHICS_FOLDER', 'Graphics Folder (Texture Pack)', function(container, infoEl, buffer, offset, length, pal) {
+    if (!pal) throw new Error('No palette loaded. Load ADEMO.DAS or another DAS with a palette.');
+
+    const view = new DataView(buffer);
+    const u8 = new Uint8Array(buffer);
+    let pos = offset;
+
+    // Header (6 bytes)
+    const blockTypeMod = view.getUint8(pos);
+    const blockType = view.getUint8(pos + 1);
+    const maxWidth = view.getUint16(pos + 2, true);
+    const maxHeight = view.getUint16(pos + 4, true);
+    const unk0x06 = view.getUint16(pos + 6, true);
+    pos = offset + 8;
+
+    // SHIFTED_IMAGE_OFFSET_ARRAY: array of 2-byte values, shifted left 4 to get offset
+    // Terminated by 4-byte null (0x00000000), then aligned to 16 bytes
+    const imageOffsets = [];
+    while (pos + 2 <= buffer.byteLength) {
+        const raw = view.getUint16(pos, true);
+        pos += 2;
+        if (raw === 0) {
+            // Check for the 4-byte null terminator (we already read 2 zero bytes)
+            if (pos + 2 <= buffer.byteLength && view.getUint16(pos, true) === 0) {
+                pos += 2;
+            }
+            break;
+        }
+        imageOffsets.push(raw << 4);
+    }
+
+    // Align to 16 bytes
+    const rem = pos % 16;
+    if (rem !== 0) pos += 16 - rem;
+
+    // Info lines
+    const lines = [];
+    lines.push(`Block type modifier: ${hex8(blockTypeMod)}`);
+    lines.push(`Block type: ${hex8(blockType)}`);
+    lines.push(`Max dimensions: ${maxWidth} x ${maxHeight}`);
+    lines.push(`Unk 0x06: ${hex16(unk0x06)}`);
+    lines.push(`Sub-image count: ${imageOffsets.length}`);
+    lines.push('');
+    lines.push('Image offsets (from data block start):');
+    imageOffsets.forEach((off, i) => lines.push(`  [${i}] 0x${off.toString(16).padStart(6, '0')}`));
+    lines.push('');
+
+    // Parse and render each sub-image
+    const subImages = [];
+    for (let i = 0; i < imageOffsets.length; i++) {
+        const imgStart = offset + imageOffsets[i];
+        if (imgStart + 6 > buffer.byteLength) {
+            lines.push(`  [${i}] ERROR: offset out of bounds`);
+            continue;
+        }
+
+        const imgMod = view.getUint8(imgStart);
+        const imgType = view.getUint8(imgStart + 1);
+        const imgW = view.getUint16(imgStart + 2, true);
+        const imgH = view.getUint16(imgStart + 4, true);
+        const pixelStart = imgStart + 6;
+
+        if (imgW <= 0 || imgH <= 0 || imgW > 2048 || imgH > 2048) {
+            lines.push(`  [${i}] mod=${hex8(imgMod)} type=${hex8(imgType)} dims=${imgW}x${imgH} SKIPPED (bad dims)`);
+            continue;
+        }
+        if (pixelStart + imgW * imgH > buffer.byteLength) {
+            lines.push(`  [${i}] mod=${hex8(imgMod)} type=${hex8(imgType)} dims=${imgW}x${imgH} SKIPPED (truncated)`);
+            continue;
+        }
+
+        lines.push(`  [${i}] mod=${hex8(imgMod)} type=${hex8(imgType)} dims=${imgW}x${imgH}`);
+
+        // Create canvas with palette lookup
+        const canvas = document.createElement('canvas');
+        canvas.width = imgW; canvas.height = imgH;
+        const ctx = canvas.getContext('2d');
+        const imgData = ctx.createImageData(imgW, imgH);
+        for (let pi = 0; pi < imgW * imgH; pi++) {
+            const palIdx = u8[pixelStart + pi];
+            const c = pal[palIdx] || { r: 0, g: 0, b: 0 };
+            imgData.data[pi * 4] = c.r;
+            imgData.data[pi * 4 + 1] = c.g;
+            imgData.data[pi * 4 + 2] = c.b;
+            imgData.data[pi * 4 + 3] = palIdx === 0 ? 0 : 255;
+        }
+        ctx.putImageData(imgData, 0, 0);
+
+        // Transpose (ROTH stores images transposed)
+        const transposed = transposeCanvas(canvas);
+        subImages.push({ index: i, width: transposed.width, height: transposed.height, canvas: transposed });
+    }
+
+    // Display all sub-images as a grid of thumbnails
+    const grid = document.createElement('div');
+    grid.style.cssText = 'display:flex;flex-wrap:wrap;gap:12px;padding:8px 0;';
+    container.appendChild(grid);
+
+    for (const sub of subImages) {
+        const card = document.createElement('div');
+        card.style.cssText = 'text-align:center;background:#1a1a2e;padding:6px;border-radius:4px;';
+
+        const label = document.createElement('div');
+        label.style.cssText = 'font-size:11px;color:#8892a2;margin-bottom:4px;';
+        label.textContent = `[${sub.index}] ${sub.width}x${sub.height}`;
+        card.appendChild(label);
+
+        const scale = Math.max(1, Math.min(4, Math.floor(Math.min(128 / sub.width, 128 / sub.height))));
+        const display = document.createElement('canvas');
+        display.width = sub.width * scale;
+        display.height = sub.height * scale;
+        display.style.cssText = 'image-rendering:pixelated;border:1px solid #333;background:#000;';
+        const dCtx = display.getContext('2d');
+        dCtx.imageSmoothingEnabled = false;
+        dCtx.drawImage(sub.canvas, 0, 0, display.width, display.height);
+        card.appendChild(display);
+
+        grid.appendChild(card);
+    }
+
+    infoEl.textContent = lines.join('\n');
+    infoEl.classList.remove('hidden');
+});
+
+// =============================================================================
 // 3D RENDERING HELPERS
 // =============================================================================
 
@@ -2467,7 +2605,11 @@ function render3DCanvas() {
     // Render faces in depth order
     for (const { fi } of faceOrder) {
         const face = obj3d.faces[fi];
-        const validIndices = face.edgeArray.filter(i => i >= 0 && i < projected.length);
+        let validIndices = face.edgeArray.filter(i => i >= 0 && i < projected.length);
+        // Remove closing vertex if it duplicates the first (edge arrays close the polygon)
+        if (validIndices.length > 3 && validIndices[validIndices.length - 1] === validIndices[0]) {
+            validIndices = validIndices.slice(0, -1);
+        }
         if (validIndices.length < 3) continue;
 
         const texInfo = (showTex && obj3d.faceTextures) ? obj3d.faceTextures[fi] : null;
