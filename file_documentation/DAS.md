@@ -30,6 +30,7 @@ DAS File Structure (WIP):
 
 ## To investigate (TODO)
 - How to specify whether a texture has full transparency or partial (potions, crystal texture)
+- Understand the connection between UNK_0x24 section and FAT block 3
 
 
 ## Main Header (68 bytes)
@@ -52,9 +53,10 @@ The DAS file header contains metadata about the file structure and offsets to va
 | 0x24 | 4 | UNK_0x24 | Unknown FAT offset |
 | 0x28 | 4 | MONSTER_MAPPING_SECTION | Offset to the [section for mapping animations to monsters](#monster-mapping-section) |
 | 0x2C | 4 | MONSTER_MAPPING_SECTION_SIZE | Size of MONSTER_MAPPING_SECTION |
-| 0x30 | 4 | UNK_0x30 | `ADEMO` = `00 00 00 00`, all other `*.DAS` files = `00 0F 00 01` |
-| 0x34 | 2 | IMG_FAT_BLOCK1_COUNT | Number of entries in primary image FAT |
-| 0x36 | 2 | IMG_FAT_BLOCK2_COUNT | Number of entries in secondary image FAT |
+| 0x30 | 2 | FAT_BLOCK_1_COUNT | Number of entries in the first FAT page/block (wall/floor textures) |
+| 0x32 | 2 | FAT_BLOCK_2_COUNT | Number of entries in the second FAT page/block (always empty?) |
+| 0x34 | 2 | FAT_BLOCK_3_COUNT | Number of entries in the third FAT page/block (object-mappable textures/data) |
+| 0x36 | 2 | FAT_BLOCK_4_COUNT | Number of entries in the fourth FAT page/block (directional billboard sprites) |
 | 0x38 | 4 | UNK_0x38 | `0x00` in `DEMO*.DAS` files. |
 | 0x3C | 2 | UNK_0x38_SIZE | `0x00` in `DEMO*.DAS` files. |
 | 0x3E | 2 | UNK_0x40_SIZE | `0x00` in `DEMO*.DAS` files. |
@@ -126,11 +128,20 @@ To fully explore each of the tables, you can use this [tool](../tools/das-analys
 
 ## File Allocation Table
 
-This section directly follows the header and provides a list of 8 byte elements that point to a FAT Data Block. Whenever a FAT entry or FAT index is referenced, it is in regards to the index within this array. The total amount of slots available in the FAT can be calculated with `HEADER.SIZE_FAT / 8`. Although in most `.DAS` files there are many empty entries.
+This section directly follows the header and provides a list of 8 byte elements that point to a FAT Data Block. Whenever a FAT entry or FAT index is referenced, it is in regards to the index within this array. The total amount of slots available in the FAT can be calculated with the sum of `HEADER.FAT_BLOCK_*_COUNT` or `HEADER.SIZE_FAT / 8`. Although in most `.DAS` files there are many empty entries.
 
 | Offset | Size | Field Name | Description |
 |--------|------|------------|-------------|
 | 0x00 | HEADER.SIZE_FAT | FAT_ENTRY_ARRAY | Array of FAT_ENTRY objects |
+
+The entire section itself is categorized into 4 separate blocks or pages of FAT entry types.
+
+| Block | Size | Purpose |
+|-------|------|---------|
+| 1 | 3840 (`ADEMO.DAS` = 0) | Wall and floor textures |
+| 2 | 256 (`ADEMO.DAS` = 0) | Always empty |
+| 3 | 256 (`ADEMO.DAS` = 293) | Object-mappable sprites (3D object textures, items, etc.) |
+| 4 | variable | Directional sprites |
 
 And here is the `FAT_ENTRY` itself:
 
