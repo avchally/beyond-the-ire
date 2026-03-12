@@ -17,7 +17,7 @@ The large majority of the file is made up of sections relating to object/image d
 DAS File Structure (WIP):
 ├── Header (68 bytes)
 ├── File Allocation Table
-├── Palette Data (optional)
+├── Palette System (optional)
 ├── Unk_0x10 Section
 ├── FAT Data Blocks (bulk of the file)
 ├── Directional Object Table (optional)
@@ -29,7 +29,7 @@ DAS File Structure (WIP):
 ```
 
 ## To investigate (TODO)
-- Partial transparency (potions, crystal texture)
+- How to specify whether a texture has full transparency or partial (potions, crystal texture)
 
 
 ## Main Header (68 bytes)
@@ -42,7 +42,7 @@ The DAS file header contains metadata about the file structure and offsets to va
 | 0x04 | 2 | DAS_ID_NUM | Always 5 |
 | 0x06 | 2 | SIZE_FAT | Total size of the FAT. To retrieve the amount of FAT slots, do `SIZE_FAT / 8` |
 | 0x08 | 4 | IMG_FAT_OFFSET | Offset to image FAT (usually 0x44) |
-| 0x0C | 4 | PALETTE_OFFSET | Palette offset (0 = use ADEMO.DAS palette) |
+| 0x0C | 4 | PALETTE_SYSTEM_OFFSET | Offset to the [section containing the palette and palette remaps](#palette-system). (0 = use ADEMO.DAS palette) |
 | 0x10 | 4 | UNK_0x10_SECTION_OFFSET | Offset to Unk_0x10 Section |
 | 0x14 | 4 | FILE_NAMES_SECTION | Offset to filename section |
 | 0x18 | 2 | FILE_NAMES_SECTION_SIZE | Size of filename section |
@@ -59,6 +59,70 @@ The DAS file header contains metadata about the file structure and offsets to va
 | 0x3C | 2 | UNK_0x38_SIZE | `0x00` in `DEMO*.DAS` files. |
 | 0x3E | 2 | UNK_0x40_SIZE | `0x00` in `DEMO*.DAS` files. |
 | 0x40 | 4 | UNK_0x40 | `0x00` in `DEMO*.DAS` files. |
+
+## Palette System
+
+The Realms of the Haunting engine uses a single palette alongside 322 palette remap tables to handle not only 32 levels of shading, but also transparency blending allowing any color to be partially transparent.
+
+The palette system data starts at HEADER.PALETTE_SYSTEM_OFFSET and has the following structure:
+
+| Offset | Size | Field Name | Description |
+|--------|------|------------|-------------|
+| 0x0000 | 768 | PALETTE | 256 3-byte values representing all colors used |
+| 0x0300 | 2 | PADDING | `00 00` |
+| 0x0302 | 82432 | PALETTE_REMAP_ARRAY | The array of 322 PALETTE_REMAP_TABLE's |
+
+If the file does not contain a palette, it is inherited from `ADEMO.DAS`.
+
+This section goes all the way to HEADER.UNK_0x10_SECTION_OFFSET.
+
+### Palette
+
+The palette itself is VGA and made up of 256 6-bit colors. Each color is represented in 3 bytes, where each byte is a 6 bit value corresponding to R, G, and B respectively. 
+
+| Offset | Size | Field Name | Description |
+|--------|------|------------|-------------|
+| 0x00 | 1 | R6 | 6-bit red |
+| 0x01 | 1 | G6 | 6-bit green |
+| 0x02 | 1 | B6 | 6-bit blue |
+
+To convert each value to a standard 8 bit color:
+```
+Option 1: Close approximation
+R = R6 * 4
+G = G6 * 4
+B = B6 * 4
+
+Option 2: Mathematically correct
+R = round(R6 * 255 / 63)
+G = rount(G6 * 255 / 63)
+B = rount(B6 * 255 / 63)
+```
+Here is an image of the original palette:  
+
+<img src="images/palette.png" alt="Description" max-height="500">
+
+### Palette Remap Tables
+
+Following the palette are 322 palette remap tables. A palette remap table is a 256 byte array where the value of each byte is an index to a color in the original palette. The array (or table) then represents a new or remapped palette. This is used to efficiently render shading, allow each color to be partially transparent, and allow other effects using the original colors.
+
+As noted, there are 322 tables. Here is the breakdown of the tables:
+
+| Table | Count | Purpose |
+|-------|-------|---------|
+| 0-31 | 32 | Standard shading. First table starts bright and progressively gets near pitch black |
+| 32-63 | 32 | Some sort of tinted shading. Starts slightly dark and purple, brightens, then darkens to black |
+| 64-319 | 256 | Transparency blending. One table per original palette color, for translucent overlay rendering. This allows textures to have partial colored transparency (such as the shimmering portals) |
+| 320 | 1 | Very slightly darker than original palette |
+| 321 | 1 | Very slightly brighter than original palette |
+
+Aside from the standard shading maps, the most notable portion here are the transparency blending tables. Any color can be partially transparent, allowing textures behind it to still render, but with a tint from the original color.
+
+Here is an example of the transparency blending table for color at index 134 (`0x86`):  
+
+<img src="images/remapped_palette.png" alt="Description" max-height="500">
+
+To fully explore each of the tables, you can use this [tool](../tools/das-analysis/palette-shading-examiner.html).
 
 ## File Allocation Table
 

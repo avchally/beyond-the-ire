@@ -117,6 +117,22 @@
         @media (max-width: 700px) { .comparison-wrap { grid-template-columns: 1fr; } .comparison-arrow { display: none; } }
 
         .section-label { font-size: 13px; font-weight: 600; color: var(--accent); margin-bottom: 6px; }
+
+        /* Table category bar */
+        .category-bar { display: flex; height: 28px; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; margin-bottom: 8px; cursor: pointer; }
+        .category-segment { display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 600; letter-spacing: 0.3px; white-space: nowrap; overflow: hidden; transition: opacity 0.15s; }
+        .category-segment:hover { opacity: 0.85; }
+        .category-segment.active { outline: 2px solid #fff; outline-offset: -2px; z-index: 1; }
+
+        .category-legend { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 10px; }
+        .category-legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+        .category-legend-swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(255,255,255,0.15); }
+
+        .category-tag { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+
+        /* Blend color indicator */
+        .blend-indicator { display: flex; align-items: center; gap: 8px; margin-top: 6px; padding: 6px 10px; background: var(--panel-alt); border: 1px solid var(--border); border-radius: 6px; }
+        .blend-swatch { width: 24px; height: 24px; border: 2px solid var(--border); border-radius: 4px; }
     </style>
 </head>
 <body>
@@ -153,6 +169,17 @@
         </div>
     </div>
 
+    <!-- Table Categories -->
+    <div class="panel hidden" id="p-categories">
+        <div class="panel-head" onclick="togglePanel(this)"><h2>Table Categories</h2><span class="toggle-icon">&#9660;</span></div>
+        <div class="panel-body">
+            <p class="small muted" style="margin-bottom:8px">Click a segment to jump to that range in the shading slider.</p>
+            <div id="categoryBar" class="category-bar"></div>
+            <div id="categoryLegend" class="category-legend"></div>
+            <div id="categoryDetail" class="small mono" style="margin-top:6px"></div>
+        </div>
+    </div>
+
     <!-- Palette -->
     <div class="panel hidden" id="p-palette">
         <div class="panel-head" onclick="togglePanel(this)"><h2>Palette</h2><span class="badge">256 colors</span><span class="toggle-icon">&#9660;</span></div>
@@ -168,16 +195,16 @@
         <div class="panel-head" onclick="togglePanel(this)"><h2>Shading Lookup Tables</h2><span id="shadingBadge" class="badge"></span><span class="toggle-icon">&#9660;</span></div>
         <div class="panel-body">
             <div class="section-label">Shading Table Comparison</div>
-            <p class="small muted" style="margin-bottom:8px">Use the slider to select a shading level. Table 0 = brightest, Table N = darkest.</p>
+            <p class="small muted" style="margin-bottom:8px">Use the slider to browse color remapping tables. See the Table Categories panel above for range meanings.</p>
 
             <div class="slider-row">
-                <span class="small muted">Bright</span>
                 <input type="range" id="shadingSlider" min="0" max="0" value="0" oninput="onShadingSliderChange()">
-                <span class="small muted">Dark</span>
                 <span id="shadingSliderLabel" class="slider-label">Table 0 / 0</span>
             </div>
+            <div id="shadingCategoryTag" style="margin-bottom:8px"></div>
+            <div id="blendIndicator" class="blend-indicator hidden"></div>
 
-            <div class="comparison-wrap">
+            <div class="comparison-wrap" style="margin-top:10px">
                 <div>
                     <div class="section-label">Original Palette</div>
                     <div id="origPaletteGrid" class="palette-grid"></div>
@@ -270,6 +297,34 @@ let currentShadingTable = 0;
 let headerInfo = {};
 
 // =============================================================================
+// TABLE CATEGORIES
+// =============================================================================
+
+const TABLE_CATEGORIES = [
+    { id: 'distance',     label: 'Distance Shading',     range: [0, 31],    color: '#5db3ff', desc: 'Progressive darkening to black' },
+    { id: 'tinted',       label: 'Tinted Shading',       range: [32, 63],   color: '#c084fc', desc: 'Purple-tinted, brightens then darkens' },
+    { id: 'transparency', label: 'Transparency Blend',   range: [64, 319],  color: '#7ddc86', desc: 'Per-palette-color translucent blend' },
+    { id: 'blue_darken',  label: 'Blue-Tinted Darken',   range: [320, 320], color: '#48b8d0', desc: 'Slight darkening with blue/cool shift' },
+    { id: 'cool_shift',   label: 'Color Cooling',        range: [321, 321], color: '#88a8cc', desc: 'Subtle shift toward cooler tones' },
+];
+
+function getTableCategory(tableIndex) {
+    for (const cat of TABLE_CATEGORIES) {
+        if (tableIndex >= cat.range[0] && tableIndex <= cat.range[1]) return cat;
+    }
+    return { id: 'unknown', label: 'Unknown', range: [0, 0], color: '#8892a2', desc: '' };
+}
+
+function getTableLabel(tableIndex) {
+    const cat = getTableCategory(tableIndex);
+    if (cat.id === 'transparency') {
+        const blendColorIdx = tableIndex - 64;
+        return `Transparency Blend — palette color ${blendColorIdx} (${hex8(blendColorIdx)})`;
+    }
+    return cat.label;
+}
+
+// =============================================================================
 // UTILITIES
 // =============================================================================
 
@@ -354,7 +409,7 @@ function clearAll() {
 
     document.getElementById('loadStatus').textContent = 'Waiting for file...';
     document.getElementById('fileLabel').textContent = '';
-    ['p-summary', 'p-palette', 'p-shading', 'p-luminance', 'p-identity', 'p-raw'].forEach(id =>
+    ['p-summary', 'p-categories', 'p-palette', 'p-shading', 'p-luminance', 'p-identity', 'p-raw'].forEach(id =>
         document.getElementById(id).classList.add('hidden')
     );
     setStatus('Cleared.');
@@ -443,11 +498,12 @@ function analyze() {
     }
 
     // Show panels
-    ['p-summary', 'p-palette', 'p-shading', 'p-luminance', 'p-identity', 'p-raw'].forEach(id =>
+    ['p-summary', 'p-categories', 'p-palette', 'p-shading', 'p-luminance', 'p-identity', 'p-raw'].forEach(id =>
         document.getElementById(id).classList.remove('hidden')
     );
 
     renderSummary();
+    renderCategories();
     renderPaletteGrid('paletteGrid', palette, true);
     setupShadingSlider();
     renderShadingComparison();
@@ -485,6 +541,62 @@ function renderSummary() {
 }
 
 // =============================================================================
+// TABLE CATEGORIES VISUALIZATION
+// =============================================================================
+
+function renderCategories() {
+    const bar = document.getElementById('categoryBar');
+    const legend = document.getElementById('categoryLegend');
+    bar.innerHTML = '';
+    legend.innerHTML = '';
+
+    if (shadingTables.length === 0) return;
+
+    const total = shadingTables.length;
+
+    TABLE_CATEGORIES.forEach(cat => {
+        const lo = Math.min(cat.range[0], total - 1);
+        const hi = Math.min(cat.range[1], total - 1);
+        if (lo >= total) return;
+        const count = hi - lo + 1;
+        const pct = (count / total) * 100;
+
+        // Bar segment
+        const seg = document.createElement('div');
+        seg.className = 'category-segment';
+        seg.style.width = pct + '%';
+        seg.style.background = cat.color;
+        seg.style.color = '#111';
+        seg.title = `${cat.label}: tables ${lo}–${hi} (${count} tables)\n${cat.desc}`;
+        if (pct > 8) seg.textContent = cat.label;
+        seg.addEventListener('click', () => jumpToTable(lo));
+        bar.appendChild(seg);
+
+        // Legend
+        const item = document.createElement('div');
+        item.className = 'category-legend-item';
+        item.innerHTML = `<div class="category-legend-swatch" style="background:${cat.color}"></div>
+            <span><strong>${cat.label}</strong> (${lo}–${hi}, ${count} tables) — ${cat.desc}</span>`;
+        legend.appendChild(item);
+    });
+}
+
+function jumpToTable(tableIndex) {
+    const slider = document.getElementById('shadingSlider');
+    slider.value = tableIndex;
+    onShadingSliderChange();
+}
+
+function updateCategoryHighlight() {
+    const bar = document.getElementById('categoryBar');
+    if (!bar) return;
+    const cat = getTableCategory(currentShadingTable);
+    bar.querySelectorAll('.category-segment').forEach(seg => {
+        seg.classList.toggle('active', seg.title.startsWith(cat.label));
+    });
+}
+
+// =============================================================================
 // PALETTE GRID
 // =============================================================================
 
@@ -513,11 +625,15 @@ function renderPaletteGrid(containerId, colors, interactive) {
 }
 
 function selectColor(index) {
-    selectedColorIndex = index;
+    if (selectedColorIndex === index) {
+        selectedColorIndex = -1;
+    } else {
+        selectedColorIndex = index;
+    }
 
     // Update selection highlight on all palette grids
     document.querySelectorAll('#paletteGrid .palette-cell, #origPaletteGrid .palette-cell, #shadedPaletteGrid .palette-cell').forEach(el => {
-        el.classList.toggle('selected', parseInt(el.dataset.index) === index);
+        el.classList.toggle('selected', selectedColorIndex >= 0 && parseInt(el.dataset.index) === selectedColorIndex);
     });
 
     updatePaletteDetail();
@@ -526,6 +642,10 @@ function selectColor(index) {
 }
 
 function updatePaletteDetail() {
+    if (selectedColorIndex < 0) {
+        document.getElementById('paletteDetail').innerHTML = '<span class="small muted">Click a color to select it.</span>';
+        return;
+    }
     const c = palette[selectedColorIndex];
     const lum = luminance(c.r, c.g, c.b).toFixed(1);
     document.getElementById('paletteDetail').innerHTML = `
@@ -549,14 +669,43 @@ function setupShadingSlider() {
     slider.value = 0;
     currentShadingTable = 0;
     document.getElementById('shadingBadge').textContent = `${shadingTables.length} tables`;
+
+    // Show initial category
+    const cat = getTableCategory(0);
+    document.getElementById('shadingCategoryTag').innerHTML =
+        `<span class="category-tag" style="background:${cat.color}22;color:${cat.color};border:1px solid ${cat.color}44">${cat.label}</span>`;
+    document.getElementById('blendIndicator').classList.add('hidden');
+    updateCategoryHighlight();
 }
 
 function onShadingSliderChange() {
     const slider = document.getElementById('shadingSlider');
     currentShadingTable = parseInt(slider.value);
+
+    const cat = getTableCategory(currentShadingTable);
+    const tableLabel = getTableLabel(currentShadingTable);
+
     document.getElementById('shadingSliderLabel').textContent =
         `Table ${currentShadingTable} / ${shadingTables.length - 1}`;
     document.getElementById('shadedTableNum').textContent = currentShadingTable;
+
+    // Update category tag
+    document.getElementById('shadingCategoryTag').innerHTML =
+        `<span class="category-tag" style="background:${cat.color}22;color:${cat.color};border:1px solid ${cat.color}44">${tableLabel}</span>`;
+
+    // Show blend color swatch for transparency tables
+    const blendEl = document.getElementById('blendIndicator');
+    if (cat.id === 'transparency' && palette) {
+        const blendIdx = currentShadingTable - 64;
+        const c = palette[blendIdx];
+        blendEl.innerHTML = `<div class="blend-swatch" style="background:${rgbStr(c.r, c.g, c.b)}"></div>
+            <span class="small">Blend with palette color <strong>${blendIdx}</strong> (${hex8(blendIdx)}) — R:${c.r} G:${c.g} B:${c.b}</span>`;
+        blendEl.classList.remove('hidden');
+    } else {
+        blendEl.classList.add('hidden');
+    }
+
+    updateCategoryHighlight();
     renderShadingComparison();
     showRawData();
 }
@@ -584,7 +733,11 @@ function renderShadingStrip() {
     const strip = document.getElementById('shadingStrip');
     strip.innerHTML = '';
 
-    if (shadingTables.length === 0) return;
+    if (shadingTables.length === 0 || selectedColorIndex < 0) {
+        document.getElementById('shadingStripInfo').innerHTML = selectedColorIndex < 0
+            ? '<span class="muted">No color selected.</span>' : '';
+        return;
+    }
 
     const idx = selectedColorIndex;
     const info = [];
@@ -627,10 +780,11 @@ function renderLuminanceChart() {
 
     ctx.clearRect(0, 0, W, H);
 
-    if (shadingTables.length === 0) {
+    if (shadingTables.length === 0 || selectedColorIndex < 0) {
         ctx.fillStyle = '#8892a2';
         ctx.font = '13px "Segoe UI"';
-        ctx.fillText('No shading tables to chart.', W / 2 - 80, H / 2);
+        ctx.fillText(selectedColorIndex < 0 ? 'No color selected.' : 'No shading tables to chart.', W / 2 - 80, H / 2);
+        document.getElementById('luminanceInfo').textContent = '';
         return;
     }
 
@@ -695,6 +849,28 @@ function renderLuminanceChart() {
     ctx.textAlign = 'center';
     ctx.fillText('Luminance', 0, 0);
     ctx.restore();
+
+    // Draw category region backgrounds
+    TABLE_CATEGORIES.forEach(cat => {
+        const lo = Math.min(cat.range[0], numTables - 1);
+        const hi = Math.min(cat.range[1], numTables - 1);
+        if (lo >= numTables) return;
+        const x1 = pad.left + (lo / Math.max(1, numTables - 1)) * plotW;
+        const x2 = pad.left + (hi / Math.max(1, numTables - 1)) * plotW;
+        ctx.fillStyle = cat.color + '10'; // very faint
+        ctx.fillRect(x1, pad.top, x2 - x1, plotH);
+        // Divider line at start of each region (skip first)
+        if (lo > 0) {
+            ctx.strokeStyle = cat.color + '40';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([3, 3]);
+            ctx.beginPath();
+            ctx.moveTo(x1, pad.top);
+            ctx.lineTo(x1, H - pad.bottom);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+    });
 
     // Plot line with gradient color
     ctx.lineWidth = 2;
