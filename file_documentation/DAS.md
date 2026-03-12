@@ -20,7 +20,7 @@ DAS File Structure (WIP):
 ├── Palette Data (optional)
 ├── Unk_0x10 Section
 ├── FAT Data Blocks (bulk of the file)
-├── Unk_0x1C Section
+├── Directional Object Table (optional)
 ├── Unk_0x24 Section
 ├── Monster Mapping Section
 ├── Unk_0x38 Section (small, found in ADEMO)
@@ -29,10 +29,7 @@ DAS File Structure (WIP):
 ```
 
 ## To investigate (TODO)
-- Small section after CHAND2 in DEMO.DAS
 - Partial transparency (potions, crystal texture)
-- Section that the index of bullets refer to
-- Why some 3D Objects are only 8 bytes in size (maybe a reference to something in ADEMO?)
 
 
 ## Main Header (68 bytes)
@@ -43,29 +40,35 @@ The DAS file header contains metadata about the file structure and offsets to va
 |--------|------|------------|-------------|
 | 0x00 | 4 | DAS_ID_STR | File signature: "DASP" |
 | 0x04 | 2 | DAS_ID_NUM | Always 5 |
-| 0x06 | 2 | SIZE_FAT | Total size of both FATs combined |
+| 0x06 | 2 | SIZE_FAT | Total size of the FAT. To retrieve the amount of FAT slots, do `SIZE_FAT / 8` |
 | 0x08 | 4 | IMG_FAT_OFFSET | Offset to image FAT (usually 0x44) |
 | 0x0C | 4 | PALETTE_OFFSET | Palette offset (0 = use ADEMO.DAS palette) |
 | 0x10 | 4 | UNK_0x10_SECTION_OFFSET | Offset to Unk_0x10 Section |
 | 0x14 | 4 | FILE_NAMES_SECTION | Offset to filename section |
 | 0x18 | 2 | FILE_NAMES_SECTION_SIZE | Size of filename section |
-| 0x1A | 2 | UNK_0x1C_SIZE | Size of Unk_0x1C Section |
-| 0x1C | 4 | UNK_0x1C_SECTION_OFFSET | Offset to Unk_0x1C Section |
+| 0x1A | 2 | DIRECTIONAL_OBJECT_TABLE_SIZE | Size of the directional object table |
+| 0x1C | 4 | DIRECTIONAL_OBJECT_TABLE | Offset to the [directional object table](#directional-object-table) |
 | 0x20 | 4 | UNK_0x20 | Unknown field |
 | 0x24 | 4 | UNK_0x24 | Unknown FAT offset |
-| 0x28 | 4 | MONSTER_MAPPING_SECTION | Offset to the section for mapping animations to monsters |
+| 0x28 | 4 | MONSTER_MAPPING_SECTION | Offset to the [section for mapping animations to monsters](#monster-mapping-section) |
 | 0x2C | 4 | MONSTER_MAPPING_SECTION_SIZE | Size of MONSTER_MAPPING_SECTION |
-| 0x30 | 4 | UNK_0x30 | Unknown field |
+| 0x30 | 4 | UNK_0x30 | `ADEMO` = `00 00 00 00`, all other `*.DAS` files = `00 0F 00 01` |
 | 0x34 | 2 | IMG_FAT_BLOCK1_COUNT | Number of entries in primary image FAT |
 | 0x36 | 2 | IMG_FAT_BLOCK2_COUNT | Number of entries in secondary image FAT |
-| 0x38 | 4 | UNK_0x38 | Unknown field |
-| 0x3C | 2 | UNK_0x38_SIZE | Size related to unk_0x38 |
-| 0x3E | 2 | UNK_0x40_SIZE | Size related to unk_0x40 |
-| 0x40 | 4 | UNK_0x40 | Unknown offset |
+| 0x38 | 4 | UNK_0x38 | `0x00` in `DEMO*.DAS` files. |
+| 0x3C | 2 | UNK_0x38_SIZE | `0x00` in `DEMO*.DAS` files. |
+| 0x3E | 2 | UNK_0x40_SIZE | `0x00` in `DEMO*.DAS` files. |
+| 0x40 | 4 | UNK_0x40 | `0x00` in `DEMO*.DAS` files. |
 
 ## File Allocation Table
 
-This section directly follows the header and provides a list of 8 byte elements that point to a FAT Data Block.
+This section directly follows the header and provides a list of 8 byte elements that point to a FAT Data Block. Whenever a FAT entry or FAT index is referenced, it is in regards to the index within this array. The total amount of slots available in the FAT can be calculated with `HEADER.SIZE_FAT / 8`. Although in most `.DAS` files there are many empty entries.
+
+| Offset | Size | Field Name | Description |
+|--------|------|------------|-------------|
+| 0x00 | HEADER.SIZE_FAT | FAT_ENTRY_ARRAY | Array of FAT_ENTRY objects |
+
+And here is the `FAT_ENTRY` itself:
 
 | Offset | Size | Field Name | Description |
 |--------|------|------------|-------------|
@@ -81,7 +84,7 @@ This section directly follows the header and provides a list of 8 byte elements 
 | 0x00 | Texture | `0x00`, `0x10`, `0x11`, `0x80` |
 | 0x02 | Sky texture | `0x00` |
 | 0x08 | | |
-| 0x20 | Bullet (most) | index to ??? |
+| 0x20 | Directional Objects (Bullets) | index within directional object table |
 | 0x24 | Monster | index within monster mapping section |
 | 0x40 | | |
 | 0x80 | Items | |
@@ -267,6 +270,8 @@ And below is the format for a FACE.
 
 ## Monster Mapping Section
 
+Starts at HEADER.MONSTER_MAPPING_SECTION.
+
 This section is an array of monster texture mapping entries, which assigns textures to various monster-related states, such as flying, walking, attacking, and dying. A monster texture mapping entry is referred to by its index in this array.
 
 | Offset | Size | Field Name | Description |
@@ -334,6 +339,33 @@ Notes:
 | 0x60 | 4 | unk_0x60               |  |
 | 0x64 | 4 | unk_0x64               |  |
 
+## Directional Object Table
+
+Located at HEADER.DIRECTIONAL_OBJECT_TABLE.
+
+Very similar to the [Directional Billboard Object](#directional-billboard-object), this section simply maps directional textures to an object. In `ADEMO.DAS`, this is primarily used to apply textures to the bullets (projectiles) of the game.
+
+Unlike Directional Billboard Objects, the texture data is not stored in this object, but are references to other FAT entries. 
+
+Each object has 8 angles from which it can be viewed. Direction 1 is the back and incrementing clockwise, with direction 5 being the front.
+
+| Offset | Size | Field Name | Description |
+|--------|------|------------|-------------|
+| 0x00 | ~ | OFFSET_ARRAY | An array of 2-byte offsets from start of the section to the associated DIRECTIONAL_OBJECT_MAPPING |
+| ~ | (OFFSET_ARRAY / 2) * 0x12 | DIRECTIONAL_OBJECT_MAPPING_ARRAY | An array of DIRECTIONAL_OBJECT_MAPPING's |
+
+`DIRECTIONAL_OBJECT_MAPPING`:
+| Offset | Size | Field Name | Description |
+|--------|------|------------|-------------|
+| 0x00 | 2 | HEADER | Always `10 80` |
+| 0x02 | 2 | DIR_1_FAT_IDX | Packed data containing the index to the FAT entry that should be mapped to the first direction.<br>If the top bit is set (bit 15), the texture will be mirrored.<br>If the file is `ADEMO.DAS`, `fat_index = first_byte \| (((second_byte & 0x7F) - 0x12) << 8)`<br>For every other `*.DAS` file, `fat_index = DIR_1_FAT_IDX & 0x7FFF` (this just retrieves the lower 15 bits) |
+| 0x02 | 2 | DIR_2_FAT_IDX | Same as DIR_1_FAT_IDX, but for direction 2 |
+| 0x02 | 2 | DIR_3_FAT_IDX | Same as DIR_1_FAT_IDX, but for direction 3 |
+| 0x02 | 2 | DIR_4_FAT_IDX | Same as DIR_1_FAT_IDX, but for direction 4 |
+| 0x02 | 2 | DIR_5_FAT_IDX | Same as DIR_1_FAT_IDX, but for direction 5 |
+| 0x02 | 2 | DIR_6_FAT_IDX | Same as DIR_1_FAT_IDX, but for direction 6 |
+| 0x02 | 2 | DIR_7_FAT_IDX | Same as DIR_1_FAT_IDX, but for direction 7 |
+| 0x02 | 2 | DIR_8_FAT_IDX | Same as DIR_1_FAT_IDX, but for direction 8 |
 
 ## File Names Section
 
@@ -351,4 +383,4 @@ Each element in both sections are a file name element, which has the following f
 | 0x00 | 2 | element_size  | Size in bytes of the file name element |
 | 0x02 | 2 | index         | The index of the FAT entry to link this file to |
 | 0x04 | title_size | title       | Null-terminated ASCII string representing the title of the file |
-| 0x04 + title_size | description_size | description | Null-terminated ASCII string represnting the description of the file |
+| 0x04 + title_size | description_size | description | Null-terminated ASCII string representing the description of the file |
