@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Palette &amp; Shading Examiner — Realms of the Haunting</title>
+    <style>
+        :root {
+            color-scheme: dark;
+            --bg: #111318;
+            --panel: #1a1e26;
+            --panel-alt: #1e2230;
+            --border: #2b3340;
+            --text: #e5e9f0;
+            --muted: #8892a2;
+            --accent: #5db3ff;
+            --green: #7ddc86;
+            --yellow: #f8d66d;
+            --orange: #f0a050;
+            --red: #ff6b6b;
+            --purple: #c084fc;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', Arial, sans-serif; font-size: 14px; line-height: 1.5; }
+
+        .app { max-width: 1400px; margin: 0 auto; padding: 12px; }
+        .app-header { display: flex; align-items: center; gap: 16px; padding: 8px 0 12px; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+        .app-header h1 { font-size: 20px; color: var(--accent); white-space: nowrap; }
+        .app-header .subtitle { font-size: 13px; color: var(--muted); }
+
+        .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 12px; overflow: hidden; }
+        .panel-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; cursor: pointer; user-select: none; border-bottom: 1px solid transparent; }
+        .panel-head:hover { background: rgba(93,179,255,0.04); }
+        .panel-head h2 { font-size: 14px; font-weight: 600; }
+        .panel-head .badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; background: #2a3040; color: var(--muted); margin-left: 8px; }
+        .panel-head .toggle-icon { color: var(--muted); font-size: 12px; transition: transform 0.15s; }
+        .panel-head.collapsed .toggle-icon { transform: rotate(-90deg); }
+        .panel-head.collapsed + .panel-body { display: none; }
+        .panel-body { padding: 12px 14px; }
+
+        .flex { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+        input, select, button, textarea {
+            background: #0f1218; color: var(--text); border: 1px solid #3a4455; border-radius: 5px;
+            padding: 6px 10px; font-size: 13px; font-family: inherit;
+        }
+        input:focus, select:focus { outline: none; border-color: var(--accent); }
+        button { cursor: pointer; background: #1e2d40; border-color: #3a5060; }
+        button:hover { border-color: var(--accent); background: #243548; }
+        button.primary { background: #1a3a5c; border-color: var(--accent); color: var(--accent); }
+        button.small { font-size: 12px; padding: 4px 8px; }
+
+        .drop-zone { border: 2px dashed #3a4455; border-radius: 8px; padding: 20px; text-align: center; cursor: pointer; transition: border-color 0.15s, background 0.15s; }
+        .drop-zone:hover, .drop-zone.dragover { border-color: var(--accent); background: rgba(93,179,255,0.06); }
+        .drop-zone input[type="file"] { display: none; }
+        .drop-zone .label { font-size: 13px; color: var(--muted); }
+
+        .stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; margin-bottom: 8px; }
+        .stat-card { background: var(--panel-alt); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; }
+        .stat-card .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
+        .stat-card .value { font-size: 22px; font-weight: 700; margin-top: 2px; }
+
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        @media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } }
+
+        .hidden { display: none; }
+        .small { font-size: 12px; }
+        .muted { color: var(--muted); }
+        .mono { font-family: 'Consolas', 'Courier New', monospace; font-size: 12px; }
+
+        .status-bar { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 8px 14px; font-family: monospace; font-size: 12px; color: var(--green); min-height: 20px; }
+        .status-bar.error { color: var(--red); }
+
+        .copy-toast { position: fixed; bottom: 20px; right: 20px; background: var(--green); color: #111; padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; z-index: 9999; opacity: 0; transition: opacity 0.2s; pointer-events: none; }
+        .copy-toast.show { opacity: 1; }
+
+        /* Palette grid */
+        .palette-grid { display: grid; grid-template-columns: repeat(16, 1fr); gap: 1px; background: #000; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+        .palette-cell { aspect-ratio: 1; cursor: pointer; position: relative; min-width: 16px; }
+        .palette-cell:hover { outline: 2px solid #fff; outline-offset: -1px; z-index: 1; }
+        .palette-cell.selected { outline: 2px solid var(--accent); outline-offset: -1px; z-index: 2; }
+
+        .palette-cell .tooltip {
+            display: none; position: absolute; bottom: calc(100% + 4px); left: 50%; transform: translateX(-50%);
+            background: #111; border: 1px solid var(--border); border-radius: 4px; padding: 4px 8px;
+            font-size: 11px; font-family: 'Consolas', monospace; white-space: nowrap; z-index: 10; pointer-events: none;
+        }
+        .palette-cell:hover .tooltip { display: block; }
+
+        /* Shading slider */
+        .slider-row { display: flex; align-items: center; gap: 12px; margin: 10px 0; }
+        .slider-row input[type="range"] { flex: 1; accent-color: var(--accent); }
+        .slider-label { min-width: 120px; font-family: 'Consolas', monospace; font-size: 13px; }
+
+        /* Luminance chart */
+        .chart-container { position: relative; background: #0f1218; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+        .chart-container canvas { display: block; width: 100%; }
+
+        /* Color detail */
+        .color-detail { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; margin-top: 10px; }
+        .color-swatch-large { width: 80px; height: 80px; border: 2px solid var(--border); border-radius: 6px; }
+        .color-info { font-family: 'Consolas', monospace; font-size: 12px; line-height: 1.8; }
+
+        /* Shading strip */
+        .shading-strip { display: flex; height: 24px; border: 1px solid var(--border); border-radius: 3px; overflow: hidden; }
+        .shading-strip-cell { flex: 1; min-width: 1px; }
+
+        /* Table for zero pattern */
+        .zero-table { max-height: 30vh; overflow: auto; }
+        .zero-table table { width: 100%; border-collapse: collapse; font-size: 12px; font-family: 'Consolas', monospace; }
+        .zero-table th, .zero-table td { padding: 3px 6px; text-align: left; border-bottom: 1px solid #252b38; }
+        .zero-table th { background: #181c24; position: sticky; top: 0; z-index: 1; font-weight: 600; color: var(--muted); text-transform: uppercase; font-size: 11px; }
+
+        /* Comparison grid */
+        .comparison-wrap { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: start; }
+        .comparison-arrow { font-size: 24px; color: var(--muted); align-self: center; padding-top: 20px; }
+        @media (max-width: 700px) { .comparison-wrap { grid-template-columns: 1fr; } .comparison-arrow { display: none; } }
+
+        .section-label { font-size: 13px; font-weight: 600; color: var(--accent); margin-bottom: 6px; }
+    </style>
+</head>
+<body>
+<div class="app">
+
+    <!-- Header -->
+    <div class="app-header">
+        <h1>Palette &amp; Shading Examiner</h1>
+        <span class="subtitle">Realms of the Haunting — Palette &amp; Shading Lookup Table Inspector</span>
+        <span id="fileLabel" class="subtitle" style="margin-left:auto"></span>
+    </div>
+
+    <!-- File Loader -->
+    <div class="panel" id="p-loader">
+        <div class="panel-head" onclick="togglePanel(this)"><h2>File Loader</h2><span class="toggle-icon">&#9660;</span></div>
+        <div class="panel-body" id="p-loader-body">
+            <div id="dropDas" class="drop-zone">
+                <div class="label">Drop a <strong>.DAS file</strong> here or click to select (must contain embedded palette, e.g. ADEMO.DAS or DEMO.DAS)</div>
+                <input id="fileDas" type="file" accept=".DAS,.das">
+            </div>
+            <div class="flex" style="margin-top:10px">
+                <button id="analyzeBtn" class="primary" onclick="analyze()">Analyze</button>
+                <button onclick="clearAll()">Clear</button>
+                <span id="loadStatus" class="small muted">Waiting for file...</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="panel hidden" id="p-summary">
+        <div class="panel-head" onclick="togglePanel(this)"><h2>Summary</h2><span class="toggle-icon">&#9660;</span></div>
+        <div class="panel-body">
+            <div id="summaryContent" class="stat-grid"></div>
+        </div>
+    </div>
+
+    <!-- Palette -->
+    <div class="panel hidden" id="p-palette">
+        <div class="panel-head" onclick="togglePanel(this)"><h2>Palette</h2><span class="badge">256 colors</span><span class="toggle-icon">&#9660;</span></div>
+        <div class="panel-body">
+            <div class="section-label">Base Palette (from file)</div>
+            <div id="paletteGrid" class="palette-grid"></div>
+            <div id="paletteDetail" class="color-detail" style="margin-top:10px"></div>
+        </div>
+    </div>
+
+    <!-- Shading Tables -->
+    <div class="panel hidden" id="p-shading">
+        <div class="panel-head" onclick="togglePanel(this)"><h2>Shading Lookup Tables</h2><span id="shadingBadge" class="badge"></span><span class="toggle-icon">&#9660;</span></div>
+        <div class="panel-body">
+            <div class="section-label">Shading Table Comparison</div>
+            <p class="small muted" style="margin-bottom:8px">Use the slider to select a shading level. Table 0 = brightest, Table N = darkest.</p>
+
+            <div class="slider-row">
+                <span class="small muted">Bright</span>
+                <input type="range" id="shadingSlider" min="0" max="0" value="0" oninput="onShadingSliderChange()">
+                <span class="small muted">Dark</span>
+                <span id="shadingSliderLabel" class="slider-label">Table 0 / 0</span>
+            </div>
+
+            <div class="comparison-wrap">
+                <div>
+                    <div class="section-label">Original Palette</div>
+                    <div id="origPaletteGrid" class="palette-grid"></div>
+                </div>
+                <div class="comparison-arrow">&#10132;</div>
+                <div>
+                    <div class="section-label">Shaded Palette (Table <span id="shadedTableNum">0</span>)</div>
+                    <div id="shadedPaletteGrid" class="palette-grid"></div>
+                </div>
+            </div>
+
+            <div style="margin-top: 14px;">
+                <div class="section-label">Shading Strip for Selected Color</div>
+                <p class="small muted" style="margin-bottom:6px">Click any palette cell above to select a color, then see how it shades across all tables.</p>
+                <div id="shadingStripWrap">
+                    <div id="shadingStrip" class="shading-strip" style="margin-bottom:6px"></div>
+                    <div id="shadingStripInfo" class="small mono"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Luminance Chart -->
+    <div class="panel hidden" id="p-luminance">
+        <div class="panel-head" onclick="togglePanel(this)"><h2>Luminance Curve</h2><span class="toggle-icon">&#9660;</span></div>
+        <div class="panel-body">
+            <p class="small muted" style="margin-bottom:8px">Select a palette color to see its luminance across all shading tables.</p>
+            <div class="chart-container">
+                <canvas id="luminanceCanvas" width="800" height="250"></canvas>
+            </div>
+            <div id="luminanceInfo" class="small mono" style="margin-top:6px"></div>
+        </div>
+    </div>
+
+    <!-- Identity Analysis -->
+    <div class="panel hidden" id="p-identity">
+        <div class="panel-head" onclick="togglePanel(this)"><h2>Table Analysis</h2><span class="toggle-icon">&#9660;</span></div>
+        <div class="panel-body">
+            <div class="grid-2">
+                <div>
+                    <div class="section-label">Identity Check (Table 0)</div>
+                    <p class="small muted" style="margin-bottom:6px">Indices where Table 0 differs from identity mapping (i.e., index != remapped value).</p>
+                    <div id="identityDiffs" class="zero-table"></div>
+                </div>
+                <div>
+                    <div class="section-label">Always-Zero Indices</div>
+                    <p class="small muted" style="margin-bottom:6px">Palette indices that map to 0 across all shading tables (reserved/transparent).</p>
+                    <div id="alwaysZero" class="zero-table"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Raw Hex -->
+    <div class="panel hidden" id="p-raw">
+        <div class="panel-head" onclick="togglePanel(this)"><h2>Raw Data</h2><span class="toggle-icon">&#9660;</span></div>
+        <div class="panel-body">
+            <div class="flex" style="margin-bottom:8px">
+                <label class="small">Show:</label>
+                <select id="rawSelect" onchange="showRawData()">
+                    <option value="palette">Palette (768 bytes)</option>
+                    <option value="shading">Current Shading Table (256 bytes)</option>
+                    <option value="header">DAS Header (68 bytes)</option>
+                </select>
+                <button class="small" onclick="copyRawHex()">Copy Hex</button>
+            </div>
+            <pre id="rawHex" class="mono" style="background:#0f1218; padding:10px; border-radius:6px; max-height:35vh; overflow:auto; line-height:1.4; color:#c0c8d8;"></pre>
+        </div>
+    </div>
+
+    <!-- Status -->
+    <div id="statusBar" class="status-bar">Idle.</div>
+</div>
+
+<div id="copyToast" class="copy-toast">Copied!</div>
+
+<script>
+// =============================================================================
+// STATE
+// =============================================================================
+
+let fileBuffer = null;
+let fileName = '';
+let palette = null;           // [{r,g,b}, ...256]  (already *4 for VGA)
+let shadingTables = [];       // array of 256-byte arrays
+let selectedColorIndex = 32;  // default 0x20
+let currentShadingTable = 0;
+
+// Header fields we care about
+let headerInfo = {};
+
+// =============================================================================
+// UTILITIES
+// =============================================================================
+
+function hex(n, w = 2) { return (n >>> 0).toString(16).toUpperCase().padStart(w, '0'); }
+function hex8(n) { return '0x' + hex(n, 2); }
+function hex32(n) { return '0x' + hex(n, 8); }
+
+function setStatus(msg, isError = false) {
+    const el = document.getElementById('statusBar');
+    el.textContent = msg;
+    el.className = 'status-bar' + (isError ? ' error' : '');
+}
+
+function showToast(msg) {
+    const el = document.getElementById('copyToast');
+    el.textContent = msg;
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), 1500);
+}
+
+function togglePanel(headEl) {
+    const body = headEl.nextElementSibling;
+    if (!body) return;
+    const isCollapsed = headEl.classList.contains('collapsed');
+    if (isCollapsed) {
+        headEl.classList.remove('collapsed');
+        body.style.display = '';
+    } else {
+        headEl.classList.add('collapsed');
+        body.style.display = 'none';
+    }
+}
+
+function luminance(r, g, b) {
+    // Relative luminance (perceived brightness)
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+function rgbStr(r, g, b) {
+    return `rgb(${r},${g},${b})`;
+}
+
+// =============================================================================
+// FILE LOADING
+// =============================================================================
+
+function wireDrop(dropEl, inputEl, cb) {
+    dropEl.addEventListener('dragover', e => { e.preventDefault(); dropEl.classList.add('dragover'); });
+    dropEl.addEventListener('dragleave', () => dropEl.classList.remove('dragover'));
+    dropEl.addEventListener('drop', async e => {
+        e.preventDefault(); dropEl.classList.remove('dragover');
+        const files = e.dataTransfer.files;
+        if (!files || files.length === 0) return;
+        const f = files[0];
+        const buf = await f.arrayBuffer();
+        cb(buf, f.name);
+    });
+    dropEl.addEventListener('click', () => inputEl.click());
+    inputEl.addEventListener('change', async () => {
+        const f = inputEl.files[0];
+        if (!f) return;
+        const buf = await f.arrayBuffer();
+        cb(buf, f.name);
+    });
+}
+
+wireDrop(document.getElementById('dropDas'), document.getElementById('fileDas'), (buf, name) => {
+    fileBuffer = buf;
+    fileName = name;
+    document.getElementById('loadStatus').textContent = `Loaded: ${name} (${buf.byteLength.toLocaleString()} bytes)`;
+    document.getElementById('fileLabel').textContent = name;
+});
+
+function clearAll() {
+    fileBuffer = null;
+    fileName = '';
+    palette = null;
+    shadingTables = [];
+    headerInfo = {};
+    selectedColorIndex = 32;
+    currentShadingTable = 0;
+
+    document.getElementById('loadStatus').textContent = 'Waiting for file...';
+    document.getElementById('fileLabel').textContent = '';
+    ['p-summary', 'p-palette', 'p-shading', 'p-luminance', 'p-identity', 'p-raw'].forEach(id =>
+        document.getElementById(id).classList.add('hidden')
+    );
+    setStatus('Cleared.');
+}
+
+// =============================================================================
+// PARSER
+// =============================================================================
+
+function analyze() {
+    if (!fileBuffer) {
+        setStatus('No file loaded. Drop a DAS file first.', true);
+        return;
+    }
+
+    setStatus('Analyzing...');
+    const view = new DataView(fileBuffer);
+    const fileSize = fileBuffer.byteLength;
+
+    if (fileSize < 68) {
+        setStatus('File too small for DAS header (need at least 68 bytes).', true);
+        return;
+    }
+
+    // Read header
+    const sig = '';
+    for (let i = 0; i < 4; i++) {
+        // just for display
+    }
+
+    headerInfo = {
+        signature: String.fromCharCode(view.getUint8(0), view.getUint8(1), view.getUint8(2), view.getUint8(3)),
+        version: view.getUint16(0x04, true),
+        sizeFat: view.getUint16(0x06, true),
+        imgFatOffset: view.getUint32(0x08, true),
+        paletteOffset: view.getUint32(0x0C, true),
+        specialEffectTablesOffset: view.getUint32(0x10, true),
+        fileNamesOffset: view.getUint32(0x14, true),
+        fileNamesSize: view.getUint16(0x18, true),
+    };
+
+    // Validate palette
+    if (headerInfo.paletteOffset === 0 || headerInfo.paletteOffset + 768 > fileSize) {
+        setStatus(`No palette found in this file (palette offset: ${hex32(headerInfo.paletteOffset)}). Try a file with an embedded palette like ADEMO.DAS or DEMO.DAS.`, true);
+        return;
+    }
+
+    // Read palette (VGA 6-bit values, multiply by 4)
+    palette = [];
+    const palOff = headerInfo.paletteOffset;
+    for (let i = 0; i < 256; i++) {
+        palette.push({
+            r: view.getUint8(palOff + i * 3) * 4,
+            g: view.getUint8(palOff + i * 3 + 1) * 4,
+            b: view.getUint8(palOff + i * 3 + 2) * 4,
+        });
+    }
+
+    // Read shading tables
+    // 2-byte padding sits between palette end and shading tables start
+    const paletteEnd = palOff + 768;
+    const paddingOffset = paletteEnd;
+    const shadingStart = paletteEnd + 2;
+    const specialOff = headerInfo.specialEffectTablesOffset;
+    shadingTables = [];
+
+    if (specialOff > shadingStart && specialOff <= fileSize) {
+        // Read the 2-byte padding for display
+        headerInfo.paddingByte0 = view.getUint8(paddingOffset);
+        headerInfo.paddingByte1 = view.getUint8(paddingOffset + 1);
+
+        const shadingSize = specialOff - shadingStart;
+        const numTables = Math.floor(shadingSize / 256);
+
+        for (let i = 0; i < numTables; i++) {
+            const tableOffset = shadingStart + (i * 256);
+            const table = [];
+            for (let j = 0; j < 256; j++) {
+                table.push(view.getUint8(tableOffset + j));
+            }
+            shadingTables.push(table);
+        }
+
+        // Check for leftover bytes (shadingSize not evenly divisible by 256)
+        headerInfo.shadingLeftoverBytes = shadingSize - (numTables * 256);
+    }
+
+    // Show panels
+    ['p-summary', 'p-palette', 'p-shading', 'p-luminance', 'p-identity', 'p-raw'].forEach(id =>
+        document.getElementById(id).classList.remove('hidden')
+    );
+
+    renderSummary();
+    renderPaletteGrid('paletteGrid', palette, true);
+    setupShadingSlider();
+    renderShadingComparison();
+    renderShadingStrip();
+    renderLuminanceChart();
+    renderIdentityAnalysis();
+    showRawData();
+
+    setStatus(`Analyzed ${fileName}: palette at ${hex32(palOff)}, ${shadingTables.length} shading tables found.`);
+}
+
+// =============================================================================
+// SUMMARY
+// =============================================================================
+
+function renderSummary() {
+    const palEnd = headerInfo.paletteOffset + 768;
+    const shadingStart = palEnd + 2;
+    const shadingBytes = shadingTables.length * 256;
+    const padding = headerInfo.paddingByte0 !== undefined
+        ? `${hex8(headerInfo.paddingByte0)} ${hex8(headerInfo.paddingByte1)}`
+        : 'N/A';
+    const leftover = headerInfo.shadingLeftoverBytes || 0;
+
+    document.getElementById('summaryContent').innerHTML = `
+        <div class="stat-card"><div class="label">File</div><div class="value" style="font-size:14px">${fileName}</div></div>
+        <div class="stat-card"><div class="label">Palette Offset</div><div class="value mono" style="font-size:16px">${hex32(headerInfo.paletteOffset)}</div></div>
+        <div class="stat-card"><div class="label">Post-Palette Padding</div><div class="value mono" style="font-size:16px">${padding}</div></div>
+        <div class="stat-card"><div class="label">Shading Start</div><div class="value mono" style="font-size:16px">${hex32(shadingStart)}</div></div>
+        <div class="stat-card"><div class="label">Shading Tables</div><div class="value">${shadingTables.length}</div></div>
+        <div class="stat-card"><div class="label">Shading Size</div><div class="value">${shadingBytes.toLocaleString()} B</div></div>
+        <div class="stat-card"><div class="label">Special FX Offset</div><div class="value mono" style="font-size:16px">${hex32(headerInfo.specialEffectTablesOffset)}</div></div>
+        ${leftover > 0 ? `<div class="stat-card"><div class="label">Leftover Bytes</div><div class="value" style="color:var(--yellow)">${leftover}</div></div>` : ''}
+    `;
+}
+
+// =============================================================================
+// PALETTE GRID
+// =============================================================================
+
+function renderPaletteGrid(containerId, colors, interactive) {
+    const container = document.getElementById(containerId);
+    container.innerHTML = '';
+
+    for (let i = 0; i < 256; i++) {
+        const c = colors[i];
+        const cell = document.createElement('div');
+        cell.className = 'palette-cell' + (interactive && i === selectedColorIndex ? ' selected' : '');
+        cell.style.backgroundColor = rgbStr(c.r, c.g, c.b);
+        cell.dataset.index = i;
+
+        const tooltip = document.createElement('div');
+        tooltip.className = 'tooltip';
+        tooltip.textContent = `#${i} (${hex8(i)}) R:${c.r} G:${c.g} B:${c.b}`;
+        cell.appendChild(tooltip);
+
+        if (interactive) {
+            cell.addEventListener('click', () => selectColor(i));
+        }
+
+        container.appendChild(cell);
+    }
+}
+
+function selectColor(index) {
+    selectedColorIndex = index;
+
+    // Update selection highlight on all palette grids
+    document.querySelectorAll('#paletteGrid .palette-cell, #origPaletteGrid .palette-cell, #shadedPaletteGrid .palette-cell').forEach(el => {
+        el.classList.toggle('selected', parseInt(el.dataset.index) === index);
+    });
+
+    updatePaletteDetail();
+    renderShadingStrip();
+    renderLuminanceChart();
+}
+
+function updatePaletteDetail() {
+    const c = palette[selectedColorIndex];
+    const lum = luminance(c.r, c.g, c.b).toFixed(1);
+    document.getElementById('paletteDetail').innerHTML = `
+        <div class="color-swatch-large" style="background:${rgbStr(c.r, c.g, c.b)}"></div>
+        <div class="color-info">
+Index: ${selectedColorIndex} (${hex8(selectedColorIndex)})
+RGB:   ${c.r}, ${c.g}, ${c.b}
+Hex:   #${hex(c.r)}${hex(c.g)}${hex(c.b)}
+Lum:   ${lum}
+        </div>
+    `;
+}
+
+// =============================================================================
+// SHADING COMPARISON
+// =============================================================================
+
+function setupShadingSlider() {
+    const slider = document.getElementById('shadingSlider');
+    slider.max = Math.max(0, shadingTables.length - 1);
+    slider.value = 0;
+    currentShadingTable = 0;
+    document.getElementById('shadingBadge').textContent = `${shadingTables.length} tables`;
+}
+
+function onShadingSliderChange() {
+    const slider = document.getElementById('shadingSlider');
+    currentShadingTable = parseInt(slider.value);
+    document.getElementById('shadingSliderLabel').textContent =
+        `Table ${currentShadingTable} / ${shadingTables.length - 1}`;
+    document.getElementById('shadedTableNum').textContent = currentShadingTable;
+    renderShadingComparison();
+    showRawData();
+}
+
+function renderShadingComparison() {
+    // Original palette (left side)
+    renderPaletteGrid('origPaletteGrid', palette, true);
+
+    // Shaded palette (right side)
+    if (shadingTables.length === 0) {
+        document.getElementById('shadedPaletteGrid').innerHTML = '<div class="small muted">No shading tables found.</div>';
+        return;
+    }
+
+    const table = shadingTables[currentShadingTable];
+    const shadedColors = table.map(remapped => palette[remapped] || { r: 0, g: 0, b: 0 });
+    renderPaletteGrid('shadedPaletteGrid', shadedColors, true);
+}
+
+// =============================================================================
+// SHADING STRIP
+// =============================================================================
+
+function renderShadingStrip() {
+    const strip = document.getElementById('shadingStrip');
+    strip.innerHTML = '';
+
+    if (shadingTables.length === 0) return;
+
+    const idx = selectedColorIndex;
+    const info = [];
+
+    for (let t = 0; t < shadingTables.length; t++) {
+        const remapped = shadingTables[t][idx];
+        const c = palette[remapped];
+        const cell = document.createElement('div');
+        cell.className = 'shading-strip-cell';
+        cell.style.backgroundColor = rgbStr(c.r, c.g, c.b);
+        cell.title = `Table ${t}: index ${hex8(idx)} → ${hex8(remapped)} (R:${c.r} G:${c.g} B:${c.b})`;
+        strip.appendChild(cell);
+    }
+
+    // Show info about selected color
+    const orig = palette[idx];
+    const firstRemapped = shadingTables[0][idx];
+    const lastRemapped = shadingTables[shadingTables.length - 1][idx];
+    const firstC = palette[firstRemapped];
+    const lastC = palette[lastRemapped];
+
+    document.getElementById('shadingStripInfo').innerHTML =
+        `Color ${hex8(idx)} (R:${orig.r} G:${orig.g} B:${orig.b}) — ` +
+        `Table 0 → ${hex8(firstRemapped)} (L:${luminance(firstC.r, firstC.g, firstC.b).toFixed(1)}) — ` +
+        `Table ${shadingTables.length - 1} → ${hex8(lastRemapped)} (L:${luminance(lastC.r, lastC.g, lastC.b).toFixed(1)})`;
+
+    updatePaletteDetail();
+}
+
+// =============================================================================
+// LUMINANCE CHART
+// =============================================================================
+
+function renderLuminanceChart() {
+    const canvas = document.getElementById('luminanceCanvas');
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width;
+    const H = canvas.height;
+    const pad = { top: 20, right: 20, bottom: 30, left: 50 };
+
+    ctx.clearRect(0, 0, W, H);
+
+    if (shadingTables.length === 0) {
+        ctx.fillStyle = '#8892a2';
+        ctx.font = '13px "Segoe UI"';
+        ctx.fillText('No shading tables to chart.', W / 2 - 80, H / 2);
+        return;
+    }
+
+    const idx = selectedColorIndex;
+    const numTables = shadingTables.length;
+    const plotW = W - pad.left - pad.right;
+    const plotH = H - pad.top - pad.bottom;
+
+    // Collect luminance values
+    const lumValues = [];
+    let maxLum = 0;
+    for (let t = 0; t < numTables; t++) {
+        const remapped = shadingTables[t][idx];
+        const c = palette[remapped];
+        const l = luminance(c.r, c.g, c.b);
+        lumValues.push(l);
+        if (l > maxLum) maxLum = l;
+    }
+    maxLum = Math.max(maxLum, 10); // avoid zero range
+
+    // Axes
+    ctx.strokeStyle = '#2b3340';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(pad.left, pad.top);
+    ctx.lineTo(pad.left, H - pad.bottom);
+    ctx.lineTo(W - pad.right, H - pad.bottom);
+    ctx.stroke();
+
+    // Y-axis labels
+    ctx.fillStyle = '#8892a2';
+    ctx.font = '11px Consolas, monospace';
+    ctx.textAlign = 'right';
+    for (let i = 0; i <= 4; i++) {
+        const val = (maxLum * i / 4).toFixed(0);
+        const y = H - pad.bottom - (plotH * i / 4);
+        ctx.fillText(val, pad.left - 6, y + 4);
+        // Grid line
+        ctx.strokeStyle = '#1e2230';
+        ctx.beginPath();
+        ctx.moveTo(pad.left, y);
+        ctx.lineTo(W - pad.right, y);
+        ctx.stroke();
+    }
+
+    // X-axis labels
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#8892a2';
+    const xStep = Math.max(1, Math.floor(numTables / 8));
+    for (let t = 0; t < numTables; t += xStep) {
+        const x = pad.left + (t / (numTables - 1)) * plotW;
+        ctx.fillText(String(t), x, H - pad.bottom + 16);
+    }
+
+    // X-axis title
+    ctx.fillText('Shading Table Index', pad.left + plotW / 2, H - 4);
+
+    // Y-axis title
+    ctx.save();
+    ctx.translate(12, pad.top + plotH / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.textAlign = 'center';
+    ctx.fillText('Luminance', 0, 0);
+    ctx.restore();
+
+    // Plot line with gradient color
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let t = 0; t < numTables; t++) {
+        const x = pad.left + (t / Math.max(1, numTables - 1)) * plotW;
+        const y = H - pad.bottom - (lumValues[t] / maxLum) * plotH;
+        if (t === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = '#5db3ff';
+    ctx.stroke();
+
+    // Color fill under curve
+    ctx.lineTo(pad.left + plotW, H - pad.bottom);
+    ctx.lineTo(pad.left, H - pad.bottom);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(93,179,255,0.08)';
+    ctx.fill();
+
+    // Dots at sampled points
+    const dotStep = Math.max(1, Math.floor(numTables / 30));
+    for (let t = 0; t < numTables; t += dotStep) {
+        const x = pad.left + (t / Math.max(1, numTables - 1)) * plotW;
+        const y = H - pad.bottom - (lumValues[t] / maxLum) * plotH;
+        const remapped = shadingTables[t][idx];
+        const c = palette[remapped];
+        ctx.beginPath();
+        ctx.arc(x, y, 3, 0, Math.PI * 2);
+        ctx.fillStyle = rgbStr(c.r, c.g, c.b);
+        ctx.fill();
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+    }
+
+    // Info text
+    const origC = palette[idx];
+    document.getElementById('luminanceInfo').textContent =
+        `Color ${hex8(idx)} — Original: R:${origC.r} G:${origC.g} B:${origC.b} (L:${luminance(origC.r, origC.g, origC.b).toFixed(1)}) — ` +
+        `Range: L=${lumValues[0].toFixed(1)} (table 0) → L=${lumValues[numTables - 1].toFixed(1)} (table ${numTables - 1})`;
+}
+
+// =============================================================================
+// IDENTITY / ZERO ANALYSIS
+// =============================================================================
+
+function renderIdentityAnalysis() {
+    // Identity check on table 0
+    const identityEl = document.getElementById('identityDiffs');
+    const zeroEl = document.getElementById('alwaysZero');
+
+    if (shadingTables.length === 0) {
+        identityEl.innerHTML = '<div class="small muted">No shading tables.</div>';
+        zeroEl.innerHTML = '<div class="small muted">No shading tables.</div>';
+        return;
+    }
+
+    // Table 0 identity diffs
+    const table0 = shadingTables[0];
+    let diffRows = '';
+    let diffCount = 0;
+    for (let i = 0; i < 256; i++) {
+        if (table0[i] !== i) {
+            const origC = palette[i];
+            const remC = palette[table0[i]];
+            diffRows += `<tr>
+                <td>${hex8(i)}</td>
+                <td>${hex8(table0[i])}</td>
+                <td><span style="display:inline-block;width:14px;height:14px;border:1px solid #555;vertical-align:middle;background:${rgbStr(origC.r, origC.g, origC.b)}"></span></td>
+                <td><span style="display:inline-block;width:14px;height:14px;border:1px solid #555;vertical-align:middle;background:${rgbStr(remC.r, remC.g, remC.b)}"></span></td>
+            </tr>`;
+            diffCount++;
+        }
+    }
+    identityEl.innerHTML = diffCount === 0
+        ? '<div class="small muted">Table 0 is a perfect identity mapping.</div>'
+        : `<div class="small muted" style="margin-bottom:4px">${diffCount} differences found</div>
+           <table><thead><tr><th>Index</th><th>Maps To</th><th>Orig</th><th>Mapped</th></tr></thead><tbody>${diffRows}</tbody></table>`;
+
+    // Always-zero indices (mapped to 0 in ALL tables)
+    let zeroRows = '';
+    let zeroCount = 0;
+    for (let i = 0; i < 256; i++) {
+        let allZero = true;
+        for (let t = 0; t < shadingTables.length; t++) {
+            if (shadingTables[t][i] !== 0) { allZero = false; break; }
+        }
+        if (allZero) {
+            const c = palette[i];
+            zeroRows += `<tr>
+                <td>${hex8(i)}</td>
+                <td>${i}</td>
+                <td><span style="display:inline-block;width:14px;height:14px;border:1px solid #555;vertical-align:middle;background:${rgbStr(c.r, c.g, c.b)}"></span></td>
+            </tr>`;
+            zeroCount++;
+        }
+    }
+    zeroEl.innerHTML = zeroCount === 0
+        ? '<div class="small muted">No indices are always zero.</div>'
+        : `<div class="small muted" style="margin-bottom:4px">${zeroCount} always-zero indices</div>
+           <table><thead><tr><th>Index</th><th>Dec</th><th>Color</th></tr></thead><tbody>${zeroRows}</tbody></table>`;
+}
+
+// =============================================================================
+// RAW HEX VIEW
+// =============================================================================
+
+function showRawData() {
+    const mode = document.getElementById('rawSelect').value;
+    const view = new DataView(fileBuffer);
+    let offset, length;
+
+    if (mode === 'palette') {
+        offset = headerInfo.paletteOffset;
+        length = 768;
+    } else if (mode === 'shading') {
+        if (shadingTables.length === 0) {
+            document.getElementById('rawHex').textContent = 'No shading tables found.';
+            return;
+        }
+        offset = headerInfo.paletteOffset + 768 + 2 + currentShadingTable * 256;
+        length = 256;
+    } else { // header
+        offset = 0;
+        length = 68;
+    }
+
+    let lines = [];
+    for (let row = 0; row < length; row += 16) {
+        let hexPart = '';
+        let asciiPart = '';
+        for (let col = 0; col < 16 && row + col < length; col++) {
+            const b = view.getUint8(offset + row + col);
+            hexPart += hex(b) + ' ';
+            asciiPart += (b >= 32 && b < 127) ? String.fromCharCode(b) : '.';
+        }
+        const addr = hex(offset + row, 8);
+        lines.push(`${addr}  ${hexPart.padEnd(48)} ${asciiPart}`);
+    }
+
+    document.getElementById('rawHex').textContent = lines.join('\n');
+}
+
+function copyRawHex() {
+    const text = document.getElementById('rawHex').textContent;
+    navigator.clipboard.writeText(text).then(() => showToast('Copied!'));
+}
+
+// =============================================================================
+// INIT
+// =============================================================================
+
+// Auto-analyze on load if file was already loaded (won't happen but safety)
+document.addEventListener('DOMContentLoaded', () => {
+    setStatus('Drop a .DAS file with an embedded palette to begin.');
+});
+</script>
+</body>
+</html>
