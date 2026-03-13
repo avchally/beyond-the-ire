@@ -242,6 +242,7 @@ const FACE_COLORS = ['#73c4ff', '#7ddc86', '#ffba66', '#d39cff', '#ff8888', '#88
 const COLUMNS = [
     { key: 'dasFile',          label: 'DAS File',         mono: false, filterType: 'select' },
     { key: 'fatIndex',         label: 'FAT Index',        mono: true,  filterType: 'text' },
+    { key: 'fatBlock',         label: 'FAT Block',        mono: true,  filterType: 'select' },
     { key: 'dataBlockOffset',  label: 'Offset',           mono: true,  filterType: 'text' },
     { key: 'dataSize',         label: 'Data Size',         mono: true,  filterType: 'text' },
     { key: 'flag1',            label: 'Flag 1',           mono: true,  filterType: 'text' },
@@ -420,8 +421,10 @@ function parseDASFile(name, buffer) {
         paletteOffset:          view.getUint32(0x0C, true),
         fileNamesOffset:        view.getUint32(0x14, true),
         fileNamesSize:          view.getUint16(0x18, true),
-        imgFatBlock1Count:      view.getUint16(0x34, true),
-        imgFatBlock2Count:      view.getUint16(0x36, true),
+        fatBlock1Count:         view.getUint16(0x30, true),
+        fatBlock2Count:         view.getUint16(0x32, true),
+        fatBlock3Count:         view.getUint16(0x34, true),
+        fatBlock4Count:         view.getUint16(0x36, true),
     };
 
     if (header.signature !== 'DASP') {
@@ -429,9 +432,15 @@ function parseDASFile(name, buffer) {
     }
 
     // FAT entries
-    // const totalFatCount = header.imgFatBlock1Count + header.imgFatBlock2Count;
     const totalFatCount = header.sizeFat / 8;
     const fatEntries = [];
+
+    // Block boundaries (cumulative)
+    const b1End = header.fatBlock1Count;
+    const b2End = b1End + header.fatBlock2Count;
+    const b3End = b2End + header.fatBlock3Count;
+    const b4End = b3End + header.fatBlock4Count;
+
     let p = header.imgFatOffset;
     for (let i = 0; i < totalFatCount && p + 8 <= fileSize; i++) {
         const dataBlockOffset = view.getUint32(p, true);
@@ -450,8 +459,16 @@ function parseDASFile(name, buffer) {
         // Data size depends on flag2: when 0x11, shift left 4; otherwise multiply by 2
         const dataSize = (flag2 === 0x11) ? (dataSizeBase << 4) : (dataSizeBase * 2);
 
+        // Determine which FAT block this entry belongs to
+        let fatBlock = 0;
+        if (i < b1End) fatBlock = 1;
+        else if (i < b2End) fatBlock = 2;
+        else if (i < b3End) fatBlock = 3;
+        else if (i < b4End) fatBlock = 4;
+
         fatEntries.push({
             fatIndex: i,
+            fatBlock,
             dataBlockOffset,
             dataSizeBase,
             dataSize,
@@ -503,6 +520,7 @@ function parseDASFile(name, buffer) {
         return {
             dasFile: name,
             fatIndex: fe.fatIndex,
+            fatBlock: fe.fatBlock,
             dataBlockOffset: fe.dataBlockOffset,
             dataSizeBase: fe.dataSizeBase,
             dataSize: fe.dataSize,
@@ -686,6 +704,7 @@ function formatCellValue(entry, key) {
     switch (key) {
         case 'dasFile': return entry.dasFile;
         case 'fatIndex': return String(entry.fatIndex);
+        case 'fatBlock': return entry.fatBlock > 0 ? String(entry.fatBlock) : '—';
         case 'dataBlockOffset': return entry.dataBlockOffset > 0 ? hex32(entry.dataBlockOffset) : '0';
         case 'dataSize': return String(entry.dataSize);
         case 'flag1': return hex8(entry.flag1);
