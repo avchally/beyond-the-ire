@@ -2023,7 +2023,9 @@ registerRenderer('OBJECT_3D', '3D Object (Textured)', function(container, infoEl
             if (faceSectionEnd - pos >= extra) pos += extra;
         }
 
-        faces.push({ faceDataSize, texture_lookup, render_flag, addt_render_flag, sub_texture_index, edge_count, edgeArray });
+        // When edge_count is 0, texture is pinned to a single vertex (billboard) and needs +0x1000 on the lookup
+        const effective_texture_lookup = (edge_count === 0) ? (texture_lookup + 0x1000) : texture_lookup;
+        faces.push({ faceDataSize, texture_lookup: effective_texture_lookup, render_flag, addt_render_flag, sub_texture_index, edge_count, edgeArray });
 
         if (pos <= faceStart) {
             warnings.push(`No progress at ${hex32(faceStart)}`);
@@ -2194,7 +2196,8 @@ registerRenderer('OBJECT_3D', '3D Object (Textured)', function(container, infoEl
         const f = faces[fi];
         const rf = f.render_flag;
         const rfBits = [(rf&1)?'transp':'',(rf&2)?'mirror':'',(rf&4)?'mirrorX':'',(rf&8)?'visible':''].filter(Boolean).join('+') || 'none';
-        lines.push(`Face[${fi}]: size=${f.faceDataSize} edges=${f.edge_count} render_flag=${hex8(rf)}(${rfBits}) addt=${hex8(f.addt_render_flag)}`);
+        const billboardTag = f.edge_count === 0 ? ' [BILLBOARD]' : '';
+        lines.push(`Face[${fi}]: size=${f.faceDataSize} edges=${f.edge_count} render_flag=${hex8(rf)}(${rfBits}) addt=${hex8(f.addt_render_flag)}${billboardTag}`);
         lines.push(`  ${texResolutionInfo[fi]}`);
         lines.push(`  edge_array: [${f.edgeArray.join(', ')}]`);
     }
@@ -2606,14 +2609,34 @@ function render3DCanvas() {
     for (const { fi } of faceOrder) {
         const face = obj3d.faces[fi];
         let validIndices = face.edgeArray.filter(i => i >= 0 && i < projected.length);
+
+        const texInfo = (showTex && obj3d.faceTextures) ? obj3d.faceTextures[fi] : null;
+        const isPalette = texInfo && texInfo.isPalette;
+
+        // Billboard: edge_count == 0, texture pinned to a single vertex
+        if (face.edge_count === 0 && validIndices.length >= 1 && showTex && texInfo) {
+            const rotPt = rotated[validIndices[0]];
+            const pt = projected[validIndices[0]];
+            if (!pt || !rotPt) continue;
+            const texCanvas = (texInfo.frames && texInfo.frames.length > 1)
+                ? texInfo.frames[obj3d.animFrame % texInfo.frames.length]
+                : texInfo.canvas;
+            // Project an offset point to get consistent scale with the rest of the geometry
+            const offsetPt = project3D({ x: rotPt.x + texInfo.width, y: rotPt.y + texInfo.height, z: rotPt.z }, canvas);
+            const bw = Math.abs(offsetPt.x - pt.x);
+            const bh = Math.abs(offsetPt.y - pt.y);
+            ctx.save();
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(texCanvas, pt.x - bw / 2, pt.y - bh, bw, bh);
+            ctx.restore();
+            continue;
+        }
+
         // Remove closing vertex if it duplicates the first (edge arrays close the polygon)
         if (validIndices.length > 3 && validIndices[validIndices.length - 1] === validIndices[0]) {
             validIndices = validIndices.slice(0, -1);
         }
         if (validIndices.length < 3) continue;
-
-        const texInfo = (showTex && obj3d.faceTextures) ? obj3d.faceTextures[fi] : null;
-        const isPalette = texInfo && texInfo.isPalette;
 
         // Bit 3 of render_flag = visible; skip if not set (only for real textures, not palette colors)
         if (!isPalette && (face.render_flag & 0x08) === 0) continue;
