@@ -21,7 +21,7 @@ DAS File Structure (WIP):
 ├── Unk_0x10 Section
 ├── FAT Data Blocks (bulk of the file)
 ├── Directional Object Table (optional)
-├── Unk_0x24 Section
+├── Object Collision Section
 ├── Monster Mapping Section
 ├── Unk_0x38 Section (small, found in ADEMO)
 ├── Unk_0x40 Section (small, found in ADEMO)
@@ -30,7 +30,6 @@ DAS File Structure (WIP):
 
 ## To investigate (TODO)
 - How to specify whether a texture has full transparency or partial (potions, crystal texture)
-- Understand the connection between UNK_0x24 section and FAT block 3
 
 
 ## Main Header (68 bytes)
@@ -50,7 +49,7 @@ The DAS file header contains metadata about the file structure and offsets to va
 | 0x1A | 2 | DIRECTIONAL_OBJECT_TABLE_SIZE | Size of the directional object table |
 | 0x1C | 4 | DIRECTIONAL_OBJECT_TABLE | Offset to the [directional object table](#directional-object-table) |
 | 0x20 | 4 | UNK_0x20 | Unknown field |
-| 0x24 | 4 | UNK_0x24 | Unknown FAT offset |
+| 0x24 | 4 | OBJECT_COLLISION_SECTION_OFFSET | Offset to the section that defines collision boxes for objects |
 | 0x28 | 4 | MONSTER_MAPPING_SECTION | Offset to the [section for mapping animations to monsters](#monster-mapping-section) |
 | 0x2C | 4 | MONSTER_MAPPING_SECTION_SIZE | Size of MONSTER_MAPPING_SECTION |
 | 0x30 | 2 | FAT_BLOCK_1_COUNT | Number of entries in the first FAT page/block (wall/floor textures) |
@@ -341,6 +340,35 @@ And below is the format for a FACE.
 | 0x34 | 2 | EDGE_COUNT | How many edges the face should be made up of. The following is an array of vertex indices that make the face. The vertices must make a closed loop, resulting in the array size being EDGE_COUNT + 1. If EDGE_COUNT is 0, the texture will be pinned and rendered right at the point of the vertex<br>Only values used in base game are `0x00`, `0x03`, and `0x04`. The only time  |
 | 0x36 | (EDGE_COUNT + 1) * 0x02 | EDGE_ARRAY | An array of `0x02` size vertex indices indicating the points that make up the face. Note: the vertex is a little weird, appears to be encoded << 4 (so to reference vertex index 1 the value used is `0x10` not `0x01`) |
 
+## Object Collision Section
+
+Starts at HEADER.OBJECT_COLLISION_SECTION_OFFSET.
+
+This section defines the collision box for the objects in the world. These are the FAT entries corresponding with [FAT block 3](#file-allocation-table). As a result, the size of this section is `HEADER.FAT_BLOCK_3_COUNT * 4`.
+
+| Offset | Size | Field Name | Description |
+|--------|------|------------|-------------|
+| 0x00 | HEADER.FAT_BLOCK_3_COUNT * 4 | COLLISION_BOX_ARRAY | array of collision box definitions |
+
+Each element in the array corresponds directly to the same index within FAT block 3 in the FAT entries. For example, in `DEMO.DAS` the second entry in FAT block 3 is the object `SOFA` and its corresponding collision box information is therefore the second entry in the COLLISION_BOX_ARRAY. 
+
+The collision box definition can take one of two forms:
+- standard objects
+- [3D objects](#3d-object)
+
+<b>Standard Objects</b>
+| Offset | Size | Field Name | Description |
+|--------|------|------------|-------------|
+| 0x00 | 2 | HEIGHT | height of the collision box |
+| 0x02 | 2 | WIDTH | width of the collision box (in both x and y directions) |
+
+<b>3D Objects</b>
+| Offset | Size | Field Name | Description |
+|--------|------|------------|-------------|
+| 0x00 | 1 | ? | seems to be always 0 |
+| 0x01 | 1 | HEIGHT | height of the collision box |
+| 0x02 | 1 | WIDTH_PERPENDICULAR | width perpendicular to the rotation direction |
+| 0x03 | 1 | WIDTH_PARALLEL | width parallel to the rotation direction |
 
 
 ## Monster Mapping Section
