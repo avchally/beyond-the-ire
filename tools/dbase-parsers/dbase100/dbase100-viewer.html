@@ -830,15 +830,17 @@
       labelInput.value = currentLabel;
       summary.textContent = `Trigger ${key}${currentLabel ? ' ['+currentLabel+']' : ''} • Sections: ${ts.sections} • Actions: ${ts.actions}`;
       // Opcodes table
+      let opcodeLabels = {}; try { opcodeLabels = JSON.parse(localStorage.getItem('dbase100OpcodeLabels') || '{}'); } catch {}
       const entries = Object.entries(ts.opcodeCounts).sort((a,b)=>b[1]-a[1]);
       for (const [opcodeDecStr, count] of entries) {
         const opcode = Number(opcodeDecStr);
         const opHex = '0x' + toHex(opcode, 2);
         const tr = document.createElement('tr');
+        const lbl = opcodeLabels[opHex] || (buildOpcodeCatalog().get(opcode)?.label || '');
         const argMap = ts.opcodeArgs[opHex] || {};
         const uniqueArgs = Object.keys(argMap).length;
         const topArgs = Object.entries(argMap).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([a,c])=>`${a}(${c})`).join(' ');
-        tr.innerHTML = `<td class="nowrap">${opHex}</td><td>${count}</td><td>${uniqueArgs}</td><td style="font-family:monospace">${topArgs}</td>`;
+        tr.innerHTML = `<td class="nowrap">${opHex}${lbl ? ' <span class="pill">'+lbl+'</span>' : ''}</td><td>${count}</td><td>${uniqueArgs}</td><td style="font-family:monospace">${topArgs}</td>`;
         tbodyOps.appendChild(tr);
       }
       // Items table
