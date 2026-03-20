@@ -133,6 +133,42 @@
         /* Blend color indicator */
         .blend-indicator { display: flex; align-items: center; gap: 8px; margin-top: 6px; padding: 6px 10px; background: var(--panel-alt); border: 1px solid var(--border); border-radius: 6px; }
         .blend-swatch { width: 24px; height: 24px; border: 2px solid var(--border); border-radius: 4px; }
+
+        /* Multi-file comparison */
+        .file-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 16px; font-size: 12px; font-family: 'Consolas', monospace; border: 1px solid var(--border); background: var(--panel-alt); }
+        .file-chip .dot { width: 10px; height: 10px; border-radius: 50%; }
+        .file-chip .remove-btn { cursor: pointer; color: var(--muted); font-size: 14px; margin-left: 2px; }
+        .file-chip .remove-btn:hover { color: var(--red); }
+        .file-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+
+        .cmp-palette-grid { display: grid; grid-template-columns: repeat(16, 1fr); gap: 1px; background: #000; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+        .cmp-cell { aspect-ratio: 1; min-width: 12px; position: relative; }
+        .cmp-cell.diff { outline: 2px solid var(--yellow); outline-offset: -1px; z-index: 1; }
+        .cmp-cell .tooltip { display: none; position: absolute; bottom: calc(100% + 4px); left: 50%; transform: translateX(-50%); background: #111; border: 1px solid var(--border); border-radius: 4px; padding: 4px 8px; font-size: 11px; font-family: 'Consolas', monospace; white-space: nowrap; z-index: 10; pointer-events: none; }
+        .cmp-cell:hover .tooltip { display: block; }
+
+        .cmp-file-label { font-size: 12px; font-weight: 600; margin-bottom: 4px; font-family: 'Consolas', monospace; }
+        .cmp-palettes-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+        .cmp-palettes-row > div { flex: 1; min-width: 250px; }
+
+        .diff-summary-table { width: 100%; border-collapse: collapse; font-size: 12px; font-family: 'Consolas', monospace; }
+        .diff-summary-table th, .diff-summary-table td { padding: 4px 8px; text-align: left; border-bottom: 1px solid #252b38; }
+        .diff-summary-table th { background: #181c24; position: sticky; top: 0; z-index: 1; font-weight: 600; color: var(--muted); text-transform: uppercase; font-size: 11px; }
+        .diff-summary-table tr:hover { background: rgba(93,179,255,0.04); }
+
+        .diff-swatch { display: inline-block; width: 16px; height: 16px; border: 1px solid #555; vertical-align: middle; border-radius: 2px; }
+
+        .cmp-remap-slider-row { display: flex; align-items: center; gap: 12px; margin: 10px 0; }
+        .cmp-remap-slider-row input[type="range"] { flex: 1; accent-color: var(--accent); }
+
+        .diff-count-bar { display: flex; height: 40px; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; margin: 8px 0; cursor: crosshair; }
+        .diff-count-bar-cell { min-width: 1px; transition: opacity 0.1s; }
+        .diff-count-bar-cell:hover { opacity: 0.7; }
+
+        .cmp-tab-bar { display: flex; gap: 0; border-bottom: 2px solid var(--border); margin-bottom: 12px; }
+        .cmp-tab { padding: 8px 16px; font-size: 13px; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; color: var(--muted); }
+        .cmp-tab:hover { color: var(--text); }
+        .cmp-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
     </style>
 </head>
 <body>
@@ -150,7 +186,7 @@
         <div class="panel-head" onclick="togglePanel(this)"><h2>File Loader</h2><span class="toggle-icon">&#9660;</span></div>
         <div class="panel-body" id="p-loader-body">
             <div id="dropDas" class="drop-zone">
-                <div class="label">Drop a <strong>.DAS file</strong> here or click to select (must contain embedded palette, e.g. ADEMO.DAS or DEMO.DAS)</div>
+                <div class="label">Drop a <strong>.DAS file</strong> here or click to select (must contain embedded palette — ADEMO.DAS has no palette, but DEMO*.DAS files do)</div>
                 <input id="fileDas" type="file" accept=".DAS,.das">
             </div>
             <div class="flex" style="margin-top:10px">
@@ -272,6 +308,63 @@
                 <button class="small" onclick="copyRawHex()">Copy Hex</button>
             </div>
             <pre id="rawHex" class="mono" style="background:#0f1218; padding:10px; border-radius:6px; max-height:35vh; overflow:auto; line-height:1.4; color:#c0c8d8;"></pre>
+        </div>
+    </div>
+
+    <!-- Multi-File Comparison -->
+    <div class="panel" id="p-compare">
+        <div class="panel-head" onclick="togglePanel(this)"><h2>Multi-File Palette Comparison</h2><span class="toggle-icon">&#9660;</span></div>
+        <div class="panel-body">
+            <p class="small muted" style="margin-bottom:8px">Upload multiple .DAS files to compare their palettes and palette remap tables. Files without embedded palettes (like ADEMO.DAS) will be skipped.</p>
+            <div id="dropCmp" class="drop-zone">
+                <div class="label">Drop multiple <strong>.DAS files</strong> here or click to select</div>
+                <input id="fileCmp" type="file" accept=".DAS,.das" multiple>
+            </div>
+            <div class="file-chips" id="cmpFileChips"></div>
+            <div class="flex" style="margin-top:8px">
+                <button id="compareBtn" class="primary" onclick="runComparison()">Compare</button>
+                <button onclick="clearComparison()">Clear</button>
+                <span id="cmpStatus" class="small muted">No files loaded</span>
+            </div>
+
+            <!-- Comparison Results -->
+            <div id="cmpResults" class="hidden" style="margin-top:14px">
+                <div class="cmp-tab-bar">
+                    <div class="cmp-tab active" data-tab="cmp-palettes" onclick="switchCmpTab(this)">Palette Comparison</div>
+                    <div class="cmp-tab" data-tab="cmp-remaps" onclick="switchCmpTab(this)">Remap Table Comparison</div>
+                    <div class="cmp-tab" data-tab="cmp-diff-detail" onclick="switchCmpTab(this)">Detailed Differences</div>
+                </div>
+
+                <!-- Tab: Palette Comparison -->
+                <div id="cmp-palettes">
+                    <div class="section-label">Palette Differences Overview</div>
+                    <div id="cmpPaletteSummary" class="stat-grid" style="margin-bottom:12px"></div>
+                    <div id="cmpPaletteGrids" class="cmp-palettes-row"></div>
+                    <div id="cmpPaletteDiffDetail" style="margin-top:12px"></div>
+                </div>
+
+                <!-- Tab: Remap Table Comparison -->
+                <div id="cmp-remaps" class="hidden">
+                    <div class="section-label">Remap Table Differences Heatmap</div>
+                    <p class="small muted" style="margin-bottom:8px">Each bar cell represents a remap table. Height/color intensity indicates how many of the 256 entries differ between files. Click a cell to inspect that table.</p>
+                    <div id="cmpRemapHeatmap"></div>
+                    <div class="cmp-remap-slider-row">
+                        <label class="small">Remap Table:</label>
+                        <input type="range" id="cmpRemapSlider" min="0" max="0" value="0" oninput="onCmpRemapSliderChange()">
+                        <span id="cmpRemapSliderLabel" class="slider-label mono">Table 0</span>
+                    </div>
+                    <div id="cmpRemapCategoryTag" style="margin-bottom:8px"></div>
+                    <div id="cmpRemapGrids" class="cmp-palettes-row"></div>
+                    <div id="cmpRemapDiffInfo" class="small mono" style="margin-top:6px"></div>
+                </div>
+
+                <!-- Tab: Detailed Differences -->
+                <div id="cmp-diff-detail" class="hidden">
+                    <div class="section-label">Per-Index Palette Differences</div>
+                    <p class="small muted" style="margin-bottom:8px">Lists every palette index where colors differ across files.</p>
+                    <div id="cmpDiffTable" class="zero-table" style="max-height:50vh"></div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -1021,8 +1114,414 @@ function copyRawHex() {
 }
 
 // =============================================================================
+// MULTI-FILE COMPARISON
+// =============================================================================
+
+const FILE_COLORS = ['#5db3ff', '#7ddc86', '#f8d66d', '#f0a050', '#ff6b6b', '#c084fc', '#48b8d0', '#88a8cc', '#ff9ecf', '#a5f0c5'];
+
+let cmpFiles = []; // [{name, buffer, palette, shadingTables, headerInfo}]
+
+function wireMultiDrop() {
+    const dropEl = document.getElementById('dropCmp');
+    const inputEl = document.getElementById('fileCmp');
+
+    dropEl.addEventListener('dragover', e => { e.preventDefault(); dropEl.classList.add('dragover'); });
+    dropEl.addEventListener('dragleave', () => dropEl.classList.remove('dragover'));
+    dropEl.addEventListener('drop', async e => {
+        e.preventDefault(); dropEl.classList.remove('dragover');
+        const files = e.dataTransfer.files;
+        if (!files || files.length === 0) return;
+        for (const f of files) {
+            const buf = await f.arrayBuffer();
+            addCmpFile(buf, f.name);
+        }
+    });
+    dropEl.addEventListener('click', () => inputEl.click());
+    inputEl.addEventListener('change', async () => {
+        const files = inputEl.files;
+        if (!files) return;
+        for (const f of files) {
+            const buf = await f.arrayBuffer();
+            addCmpFile(buf, f.name);
+        }
+        inputEl.value = '';
+    });
+}
+
+function addCmpFile(buf, name) {
+    // Avoid duplicates by name
+    if (cmpFiles.some(f => f.name === name)) return;
+    cmpFiles.push({ name, buffer: buf, palette: null, shadingTables: [], headerInfo: {} });
+    renderCmpChips();
+}
+
+function removeCmpFile(index) {
+    cmpFiles.splice(index, 1);
+    renderCmpChips();
+    document.getElementById('cmpResults').classList.add('hidden');
+}
+
+function renderCmpChips() {
+    const container = document.getElementById('cmpFileChips');
+    container.innerHTML = '';
+    cmpFiles.forEach((f, i) => {
+        const color = FILE_COLORS[i % FILE_COLORS.length];
+        const chip = document.createElement('div');
+        chip.className = 'file-chip';
+        chip.innerHTML = `<span class="dot" style="background:${color}"></span>${f.name}<span class="remove-btn" onclick="removeCmpFile(${i})">&times;</span>`;
+        container.appendChild(chip);
+    });
+    document.getElementById('cmpStatus').textContent = cmpFiles.length === 0
+        ? 'No files loaded'
+        : `${cmpFiles.length} file(s) loaded`;
+}
+
+function clearComparison() {
+    cmpFiles = [];
+    renderCmpChips();
+    document.getElementById('cmpResults').classList.add('hidden');
+}
+
+function parseDasPalette(buf) {
+    const view = new DataView(buf);
+    const fileSize = buf.byteLength;
+    if (fileSize < 68) return null;
+
+    const hi = {
+        signature: String.fromCharCode(view.getUint8(0), view.getUint8(1), view.getUint8(2), view.getUint8(3)),
+        paletteOffset: view.getUint32(0x0C, true),
+        specialEffectTablesOffset: view.getUint32(0x10, true),
+    };
+
+    if (hi.paletteOffset === 0 || hi.paletteOffset + 768 > fileSize) return null;
+
+    const pal = [];
+    const palOff = hi.paletteOffset;
+    for (let i = 0; i < 256; i++) {
+        pal.push({
+            r: view.getUint8(palOff + i * 3) * 4,
+            g: view.getUint8(palOff + i * 3 + 1) * 4,
+            b: view.getUint8(palOff + i * 3 + 2) * 4,
+        });
+    }
+
+    const tables = [];
+    const shadingStart = palOff + 768 + 2;
+    const specialOff = hi.specialEffectTablesOffset;
+    if (specialOff > shadingStart && specialOff <= fileSize) {
+        const numTables = Math.floor((specialOff - shadingStart) / 256);
+        for (let i = 0; i < numTables; i++) {
+            const tOff = shadingStart + (i * 256);
+            const table = [];
+            for (let j = 0; j < 256; j++) {
+                table.push(view.getUint8(tOff + j));
+            }
+            tables.push(table);
+        }
+    }
+
+    return { headerInfo: hi, palette: pal, shadingTables: tables };
+}
+
+function runComparison() {
+    if (cmpFiles.length < 2) {
+        setStatus('Need at least 2 DAS files for comparison.', true);
+        return;
+    }
+
+    // Parse all files
+    let skipped = [];
+    for (const f of cmpFiles) {
+        const result = parseDasPalette(f.buffer);
+        if (!result) {
+            skipped.push(f.name);
+            f.palette = null;
+            f.shadingTables = [];
+        } else {
+            f.palette = result.palette;
+            f.shadingTables = result.shadingTables;
+            f.headerInfo = result.headerInfo;
+        }
+    }
+
+    // Filter to files that have palettes
+    const validFiles = cmpFiles.filter(f => f.palette !== null);
+    if (validFiles.length < 2) {
+        setStatus(`Not enough files with palettes to compare. Skipped: ${skipped.join(', ')}`, true);
+        return;
+    }
+
+    document.getElementById('cmpResults').classList.remove('hidden');
+
+    renderCmpPaletteTab(validFiles);
+    renderCmpRemapTab(validFiles);
+    renderCmpDiffDetailTab(validFiles);
+
+    const msg = skipped.length > 0
+        ? `Comparing ${validFiles.length} files (skipped ${skipped.join(', ')} — no palette).`
+        : `Comparing ${validFiles.length} files.`;
+    setStatus(msg);
+}
+
+function switchCmpTab(el) {
+    const tabId = el.dataset.tab;
+    el.parentElement.querySelectorAll('.cmp-tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    ['cmp-palettes', 'cmp-remaps', 'cmp-diff-detail'].forEach(id => {
+        document.getElementById(id).classList.toggle('hidden', id !== tabId);
+    });
+}
+
+// --- Palette Comparison Tab ---
+
+function renderCmpPaletteTab(files) {
+    // Find which palette indices differ
+    const ref = files[0].palette;
+    const diffIndices = new Set();
+    for (let i = 0; i < 256; i++) {
+        for (let f = 1; f < files.length; f++) {
+            const c = files[f].palette[i];
+            if (c.r !== ref[i].r || c.g !== ref[i].g || c.b !== ref[i].b) {
+                diffIndices.add(i);
+                break;
+            }
+        }
+    }
+
+    // Summary
+    document.getElementById('cmpPaletteSummary').innerHTML = `
+        <div class="stat-card"><div class="label">Files Compared</div><div class="value">${files.length}</div></div>
+        <div class="stat-card"><div class="label">Palette Entries Differing</div><div class="value" style="color:${diffIndices.size > 0 ? 'var(--yellow)' : 'var(--green)'}">${diffIndices.size} / 256</div></div>
+        <div class="stat-card"><div class="label">Identical Entries</div><div class="value" style="color:var(--green)">${256 - diffIndices.size}</div></div>
+    `;
+
+    // Render palette grids per file
+    const gridsContainer = document.getElementById('cmpPaletteGrids');
+    gridsContainer.innerHTML = '';
+    files.forEach((f, fi) => {
+        const wrapper = document.createElement('div');
+        const color = FILE_COLORS[cmpFiles.indexOf(f) % FILE_COLORS.length];
+        wrapper.innerHTML = `<div class="cmp-file-label" style="color:${color}">${f.name}</div>`;
+        const grid = document.createElement('div');
+        grid.className = 'cmp-palette-grid';
+        for (let i = 0; i < 256; i++) {
+            const c = f.palette[i];
+            const cell = document.createElement('div');
+            cell.className = 'cmp-cell' + (diffIndices.has(i) ? ' diff' : '');
+            cell.style.backgroundColor = rgbStr(c.r, c.g, c.b);
+            const tooltip = document.createElement('div');
+            tooltip.className = 'tooltip';
+            tooltip.textContent = `#${i} (${hex8(i)}) R:${c.r} G:${c.g} B:${c.b}`;
+            cell.appendChild(tooltip);
+            grid.appendChild(cell);
+        }
+        wrapper.appendChild(grid);
+        gridsContainer.appendChild(wrapper);
+    });
+
+    // Diff detail under palettes
+    if (diffIndices.size > 0 && diffIndices.size <= 20) {
+        let html = '<div class="section-label" style="margin-top:8px">Differing Entries Preview</div><div style="display:flex;gap:8px;flex-wrap:wrap">';
+        for (const idx of [...diffIndices].sort((a, b) => a - b).slice(0, 20)) {
+            html += `<div style="text-align:center"><div class="small mono muted">${hex8(idx)}</div><div style="display:flex;gap:1px">`;
+            files.forEach(f => {
+                const c = f.palette[idx];
+                html += `<div style="width:20px;height:20px;background:${rgbStr(c.r, c.g, c.b)};border:1px solid #555" title="${f.name}: R:${c.r} G:${c.g} B:${c.b}"></div>`;
+            });
+            html += '</div></div>';
+        }
+        html += '</div>';
+        document.getElementById('cmpPaletteDiffDetail').innerHTML = html;
+    } else {
+        document.getElementById('cmpPaletteDiffDetail').innerHTML = diffIndices.size === 0
+            ? '<div class="small" style="color:var(--green);margin-top:8px">All palettes are identical!</div>'
+            : '';
+    }
+}
+
+// --- Remap Table Comparison Tab ---
+
+let cmpRemapDiffCounts = []; // [{tableIdx, count}]
+let cmpRemapValidFiles = [];
+
+function renderCmpRemapTab(files) {
+    cmpRemapValidFiles = files;
+
+    // Find the minimum table count across all files
+    const minTables = Math.min(...files.map(f => f.shadingTables.length));
+    if (minTables === 0) {
+        document.getElementById('cmpRemapHeatmap').innerHTML = '<div class="small muted">No remap tables found in one or more files.</div>';
+        return;
+    }
+
+    // Calculate diff counts per table
+    cmpRemapDiffCounts = [];
+    const ref = files[0];
+    for (let t = 0; t < minTables; t++) {
+        let count = 0;
+        for (let i = 0; i < 256; i++) {
+            for (let f = 1; f < files.length; f++) {
+                if (files[f].shadingTables[t][i] !== ref.shadingTables[t][i]) {
+                    count++;
+                    break;
+                }
+            }
+        }
+        cmpRemapDiffCounts.push({ tableIdx: t, count });
+    }
+
+    // Render heatmap bar
+    const maxDiff = Math.max(1, ...cmpRemapDiffCounts.map(d => d.count));
+    const heatmap = document.getElementById('cmpRemapHeatmap');
+    heatmap.innerHTML = '';
+    const bar = document.createElement('div');
+    bar.className = 'diff-count-bar';
+    cmpRemapDiffCounts.forEach((d, i) => {
+        const cell = document.createElement('div');
+        cell.className = 'diff-count-bar-cell';
+        const intensity = d.count / maxDiff;
+        const h = Math.max(2, intensity * 100);
+        cell.style.flex = '1';
+        cell.style.alignSelf = 'flex-end';
+        cell.style.height = h + '%';
+        if (d.count === 0) {
+            cell.style.background = 'var(--green)';
+            cell.style.opacity = '0.3';
+        } else {
+            // Interpolate yellow to red
+            const r = Math.round(248 + (255 - 248) * intensity);
+            const g = Math.round(214 * (1 - intensity));
+            const b = Math.round(109 * (1 - intensity));
+            cell.style.background = rgbStr(r, g, b);
+        }
+        const cat = getTableCategory(d.tableIdx);
+        cell.title = `Table ${d.tableIdx} (${cat.label}): ${d.count} / 256 entries differ`;
+        cell.addEventListener('click', () => {
+            document.getElementById('cmpRemapSlider').value = d.tableIdx;
+            onCmpRemapSliderChange();
+        });
+        bar.appendChild(cell);
+    });
+    heatmap.appendChild(bar);
+
+    // Summary line
+    const totalDiffTables = cmpRemapDiffCounts.filter(d => d.count > 0).length;
+    const summaryEl = document.createElement('div');
+    summaryEl.className = 'small mono';
+    summaryEl.style.marginTop = '4px';
+    summaryEl.innerHTML = `${totalDiffTables} / ${minTables} remap tables have differences. Max diff: ${maxDiff} entries in a single table.`;
+    heatmap.appendChild(summaryEl);
+
+    // Setup slider
+    const slider = document.getElementById('cmpRemapSlider');
+    slider.max = minTables - 1;
+    slider.value = 0;
+    onCmpRemapSliderChange();
+}
+
+function onCmpRemapSliderChange() {
+    const slider = document.getElementById('cmpRemapSlider');
+    const tableIdx = parseInt(slider.value);
+    const files = cmpRemapValidFiles;
+    if (files.length === 0) return;
+
+    const cat = getTableCategory(tableIdx);
+    const tableLabel = getTableLabel(tableIdx);
+    document.getElementById('cmpRemapSliderLabel').textContent = `Table ${tableIdx}`;
+    document.getElementById('cmpRemapCategoryTag').innerHTML =
+        `<span class="category-tag" style="background:${cat.color}22;color:${cat.color};border:1px solid ${cat.color}44">${tableLabel}</span>`;
+
+    // Find diffs at this table
+    const ref = files[0].shadingTables[tableIdx];
+    const diffIndices = new Set();
+    for (let i = 0; i < 256; i++) {
+        for (let f = 1; f < files.length; f++) {
+            if (files[f].shadingTables[tableIdx][i] !== ref[i]) {
+                diffIndices.add(i);
+                break;
+            }
+        }
+    }
+
+    // Render per-file remapped palette grids
+    const gridsContainer = document.getElementById('cmpRemapGrids');
+    gridsContainer.innerHTML = '';
+    files.forEach((f, fi) => {
+        const wrapper = document.createElement('div');
+        const color = FILE_COLORS[cmpFiles.indexOf(f) % FILE_COLORS.length];
+        wrapper.innerHTML = `<div class="cmp-file-label" style="color:${color}">${f.name}</div>`;
+        const grid = document.createElement('div');
+        grid.className = 'cmp-palette-grid';
+        const table = f.shadingTables[tableIdx];
+        for (let i = 0; i < 256; i++) {
+            const remapped = table[i];
+            const c = f.palette[remapped];
+            const cell = document.createElement('div');
+            cell.className = 'cmp-cell' + (diffIndices.has(i) ? ' diff' : '');
+            cell.style.backgroundColor = rgbStr(c.r, c.g, c.b);
+            const tooltip = document.createElement('div');
+            tooltip.className = 'tooltip';
+            tooltip.textContent = `#${i} → ${hex8(remapped)} R:${c.r} G:${c.g} B:${c.b}`;
+            cell.appendChild(tooltip);
+            grid.appendChild(cell);
+        }
+        wrapper.appendChild(grid);
+        gridsContainer.appendChild(wrapper);
+    });
+
+    // Diff info
+    const diffInfo = document.getElementById('cmpRemapDiffInfo');
+    diffInfo.textContent = diffIndices.size === 0
+        ? `Table ${tableIdx}: All entries identical across files.`
+        : `Table ${tableIdx}: ${diffIndices.size} entries differ — indices: ${[...diffIndices].sort((a, b) => a - b).slice(0, 30).map(i => hex8(i)).join(', ')}${diffIndices.size > 30 ? '...' : ''}`;
+}
+
+// --- Detailed Differences Tab ---
+
+function renderCmpDiffDetailTab(files) {
+    const container = document.getElementById('cmpDiffTable');
+    const ref = files[0].palette;
+    let rows = '';
+    let diffCount = 0;
+
+    for (let i = 0; i < 256; i++) {
+        let differs = false;
+        for (let f = 1; f < files.length; f++) {
+            const c = files[f].palette[i];
+            if (c.r !== ref[i].r || c.g !== ref[i].g || c.b !== ref[i].b) {
+                differs = true;
+                break;
+            }
+        }
+        if (!differs) continue;
+        diffCount++;
+
+        rows += `<tr><td>${hex8(i)}</td><td>${i}</td>`;
+        files.forEach(f => {
+            const c = f.palette[i];
+            rows += `<td><span class="diff-swatch" style="background:${rgbStr(c.r, c.g, c.b)}" title="R:${c.r} G:${c.g} B:${c.b}"></span> ${c.r},${c.g},${c.b}</td>`;
+        });
+        rows += '</tr>';
+    }
+
+    if (diffCount === 0) {
+        container.innerHTML = '<div class="small" style="color:var(--green)">All 256 palette entries are identical across all files.</div>';
+    } else {
+        let headerCols = '<th>Index</th><th>Dec</th>';
+        files.forEach(f => {
+            const color = FILE_COLORS[cmpFiles.indexOf(f) % FILE_COLORS.length];
+            headerCols += `<th style="color:${color}">${f.name}</th>`;
+        });
+        container.innerHTML = `<div class="small muted" style="margin-bottom:4px">${diffCount} palette indices differ</div>
+            <table class="diff-summary-table"><thead><tr>${headerCols}</tr></thead><tbody>${rows}</tbody></table>`;
+    }
+}
+
+// =============================================================================
 // INIT
 // =============================================================================
+
+wireMultiDrop();
 
 // Auto-analyze on load if file was already loaded (won't happen but safety)
 document.addEventListener('DOMContentLoaded', () => {
