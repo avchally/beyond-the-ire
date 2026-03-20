@@ -43,7 +43,7 @@ The DAS file header contains metadata about the file structure and offsets to va
 | 0x06 | 2 | SIZE_FAT | Total size of the FAT. To retrieve the amount of FAT slots, do `SIZE_FAT / 8` |
 | 0x08 | 4 | IMG_FAT_OFFSET | Offset to image FAT (usually 0x44) |
 | 0x0C | 4 | PALETTE_SYSTEM_OFFSET | Offset to the [section containing the palette and palette remaps](#palette-system). (0 = use ADEMO.DAS palette) |
-| 0x10 | 4 | UNK_0x10_SECTION_OFFSET | Offset to Unk_0x10 Section |
+| 0x10 | 4 | UNK_0x10_SECTION_OFFSET | Offset to [Unk_0x10 Section](#unknown-section-0x10) |
 | 0x14 | 4 | FILE_NAMES_SECTION | Offset to filename section |
 | 0x18 | 2 | FILE_NAMES_SECTION_SIZE | Size of filename section |
 | 0x1A | 2 | DIRECTIONAL_OBJECT_TABLE_SIZE | Size of the directional object table |
@@ -124,6 +124,15 @@ Here is an example of the transparency blending table for color at index 134 (`0
 <img src="images/remapped_palette.png" alt="Description" max-height="500">
 
 To fully explore each of the tables, you can use this [tool](../tools/das-analysis/palette-shading-examiner.html).
+
+## Unknown Section 0x10
+
+This section is still unknown and starts at HEADER.UNK_0x10_SECTION_OFFSET.
+
+The section only appears in the `DEMO*.DAS` files and not in `ADEMO.DAS`. Due to it following the [palette system](#palette-system) as well as the fact that there is no palette defined in `ADEMO.DAS`, it's possible that this section somehow relates to the palette. Zeroing out this section or filling it with garbage data yielded no noticeable difference in the game.
+
+This section has a fixed size of 4096 bytes. If it is related to the palette, it may represent either a 256-element array with 16-byte elements or a 16-element array with 256-byte elements.
+
 
 ## File Allocation Table
 
