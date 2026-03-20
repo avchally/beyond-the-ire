@@ -186,7 +186,7 @@ This section contains various metadata about the map and even contains fields th
 | 0x04  | 2 (signed) | INIT_Y_POS | The starting position's y-coordinate |
 | 0x06  | 2 (signed) | INIT_ROTATION | The starting rotation (facing angle) |
 | 0x08  | 2 | MOVE_SPEED | The default move speed. Default is 0x05. Values after 0x09 start to mess with collision (while sprinting). This value persists throughout the whole game. |
-| 0x0A  | 2 | PLAYER_HEIGHT | The player height. Default is 0x48. This value persists throughout the whole game. |
+| 0x0A  | 2 | PLAYER_HEIGHT | The player height divided by 2 in in-game units. Default is 0x48. This value persists throughout the whole game. |
 | 0x0C  | 2 | MAX_CLIMB | The max height that the player can climb before needing to jump. Default is 0x20. This value persists throughout the whole game. |
 | 0x0E  | 2 | MIN_FIT | The minimum size that the player can still fit through openings. Default is 0x30. This value persists throughout the whole game. |
 | 0x10  | 2 | UNK_0x10 | TODO |
