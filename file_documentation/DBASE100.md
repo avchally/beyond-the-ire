@@ -54,8 +54,7 @@ The inventory entry contains the item's metadata, cross-file references to image
 | Offset | Size (bytes) | Field | Description |
 | ----------- | ----------- | ----------- | ----------- |
 | 0x00 | 2 | LENGTH | Total size of this entry, including header and actions |
-| 0x02 | 1 | OBJECT_ID | Object ID in DAS file to spawn in the game world |
-| 0x03 | 1 | DAS_SOURCE | DAS source (0x02 for ADEMO) |
+| 0x02 | 2 | OBJECT_RENDER_LOOKUP | Bits 0-8 represent the index in the DAS's FAT Block 3 to apply to this object. If bit 9 is set, look up the object in `ADEMO.DAS` instead of the current map's `DEMO*.DAS`. |
 | 0x04 | 1 | CLOSEUP_TYPE | Type of close-up rendering/asset selection |
 | 0x05 | 1 | ITEM_TYPE | Item category (see values below) |
 | 0x06 | 1 | UNK_0x06 | Unknown BYTE |

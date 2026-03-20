@@ -3,3 +3,4 @@ node_modules/
 *.RAW
 *.RAWR
 output/
+roth_source_files/

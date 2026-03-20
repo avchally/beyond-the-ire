@@ -31,9 +31,9 @@ Here is an ongoing list of commands/actions/opcodes found in the action chain se
 | 0x1A (26)   | 23          | Change Music                      | DBase400 Offset / 8
 | 0x1C (28)   | 2           | ?                                 | Always 16777215 (0xFFFFFF)
 | 0x1D (29)   | 127         | Jump to different command         | DBASE100 command index
-| 0x1F (31)   |             | ?                                 |
+| 0x1F (31)   |             | WeaponReloadAnimation             | The animation to play when the weapon reloads. Reloading completes once the animation has finished playing.
 | 0x20 (32)   |             | WeaponAmmoRecharge                | the inventory index of the ammo refill. when second byte is 80, it's a rechargeable weapon and the first byte represents ammo recharge rate
-| 0x21 (33)   |             | ?                                 |
+| 0x21 (33)   |             | WeaponReloadSFX                   | The SFX to play when the weapon reloads.
 | 0x23 (35)   | 5           | MapCommandIndexCallback           | Performs a script from the current .RAW map file. value is the command index
 | 0x24 (36)   |             | SetMonsterMoveSpeed               | Set the move speed of a monster
 | 0x25 (37)   |             | MonsterPathingFlag?               | Slightly influencing a monster's movement/pathing
@@ -44,7 +44,7 @@ Here is an ongoing list of commands/actions/opcodes found in the action chain se
 | 0x2A (42)   |             | MonsterPrimAttackSFX              | sets the sound effect to play when monster makes its primary attack
 | 0x2B (43)   |             | MonsterPrimAttackDelay            | the delay to spawn the bullet for a monster's primary attack
 | 0x2C (44)   |             | WeaponAnimationSpeed              | for a weapon, modifies the animation play speed (directly impacts fire rate)
-| 0x2D (45)   | 55          | ?                                 | Only 1,4, or 7 (also used when initializing: weapons = 0x05, monsters = 0x02 or 0x03)
+| 0x2D (45)   | 55          | ?                                 | Only 1,4, or 7 (also used when initializing: weapons = 0x05, monsters = 0x02 or 0x03. For monsters, 0x02 = primary attack triggered from range; 0x03 = secondary attack triggered from range)
 | 0x2E (46)   |             | SetBulletDuration                 | for a bullet, the amount of time before it despawns. Used for all melee attacks.
 | 0x30 (48)   |             | FlashScreen                       | Flashes the environment. First darkness then brightness. Value is the intensity
 | 0x31 (49)   |             | MonsterDeathSFX                   | the sound effect to play when the monster dies (but not critically dies, see 0xB1)
@@ -61,7 +61,7 @@ Here is an ongoing list of commands/actions/opcodes found in the action chain se
 | 0x8D (141)  | 175         | If not flag set, next command     | Flag
 | 0x91 (145)  | 19          | Remove item                       | Item index
 | 0x9C (156)  | 2           | ExitCommand                       | always FF FF FF; used to end a command flow's execution
-| 0x9E (158)  |             | ?                                 |
+| 0x9E (158)  |             | Weapon Y screen offset            | offsets the weapon's onscreen vertical position (does not affect where projectile is fired)
 | 0xA2 (162)  |             | Weapon X screen offset            | offsets the weapon's onscreen horizontal position (affects where projectile is fired)
 | 0xA7 (167)  |             | BulletVulnerable                  | For a monster, set vulnerability against a bullet (bullet does 2x damage). this can stack
 | 0xA8 (168)  |             | SetMonsterSecondaryBullet         | sets the bullet for a monster's secondary attack
