@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "exportedAt": "2025-09-05T14:23:56.893Z",
+  "exportedAt": "2026-03-18T07:27:44.452Z",
   "opcodes": {
     "0x16": {
       "label": "TravelSpeed",
@@ -55,7 +55,7 @@
       "note": "Which icon to display on screen for an equipped weapon (0x0A is unused Mace)"
     },
     "0x2d": {
-      "label": "?",
+      "label": "? Some initializer",
       "note": "Only 1, 4, or 7 in global commands or 0x05 for weapons or for monsters: 0x02 = primary  attack triggered from range; or 0x03 = secondary attack triggered from range\n"
     },
     "0x20": {
@@ -249,6 +249,18 @@
     "0x84": {
       "label": "UnsetFlag",
       "note": ""
+    },
+    "0x1f": {
+      "label": "WeaponReloadAnimation",
+      "note": "The animation to play when the weapon reloads. Reloading completes once the animation has finished playing."
+    },
+    "0x21": {
+      "label": "WeaponReloadSFX",
+      "note": "The SFX to play when the weapon reloads."
+    },
+    "0x9e": {
+      "label": "Weapon Y screen offset",
+      "note": "offsets the weapon's onscreen vertical position (does not affect where projectile is fired)"
     }
   },
   "notes": {
@@ -306,38 +318,41 @@
     "0x83": "checks if the count of an item id in inventory is equal to a certain amount. first two bytes represent the item index to check. the third byte represents the amount to compare with",
     "0x2e": "for a bullet, the amount of time before it despawns. Used for all melee attacks.",
     "0x13": "the item ID of the bullet to associate with a weapon",
-    "0x14": "sets the max ammo before the weapon needs to be reloaded"
+    "0x14": "sets the max ammo before the weapon needs to be reloaded",
+    "0x04": "",
+    "0x0d": "",
+    "0x81": "",
+    "0x8d": "",
+    "0x01": "",
+    "0x24": "",
+    "0x84": "",
+    "0x1f": "The animation to play when the weapon reloads. Reloading completes once the animation has finished playing.",
+    "0x21": "The SFX to play when the weapon reloads.",
+    "0x9e": "offsets the weapon's onscreen vertical position (does not affect where projectile is fired)"
   },
   "opcodeLabels": {
-    "0x15": "MaxDamage",
     "0x16": "TravelSpeed",
     "0x17": "BulletHitAnimation",
     "0x19": "Play SFX",
     "0x30": "FlashScreen",
-    "0x28": "SetMonsterBullet",
-    "0x05": "Play Audio Dialog",
-    "0x00": "InventoryDocumentImage",
-    "0x02": "If item count above, continue",
-    "0x04": "SetFlag",
+    "0x15": "MaxDamage",
     "0x08": "Choice string",
+    "0x02": "If item count above, continue",
     "0x09": "Start choice sequence",
     "0x0a": "End choice sequence",
-    "0x0d": "If flag set, then next command",
     "0x11": "Give item",
     "0x1c": "?",
     "0x1d": "Jump to command",
-    "0x81": "If not flag set, continue",
-    "0x82": "If item count below or equal, continue",
-    "0x8d": "If not flag set, next command",
     "0x33": "WeaponIconUI",
-    "0x2d": "?",
+    "0x2d": "? Some initializer",
     "0x20": "WeaponAmmoRecharge",
     "0x12": "WeaponAnimation",
     "0x18": "WeaponBulletDelay",
-    "0x01": "If flag set, continue",
     "0xa2": "Weapon X screen offset",
     "0x2c": "WeaponAnimationSpeed",
+    "0x00": "InventoryDocumentImage",
     "0xa8": "SetMonsterSecondaryBullet",
+    "0x28": "SetMonsterBullet",
     "0xa7": "BulletVulnerable",
     "0x27": "BulletImmunity",
     "0xa9": "OnMonsterDamageSFX",
@@ -349,8 +364,7 @@
     "0xaa": "MonsterSecondAttackSFX",
     "0xab": "MonsterSecondAttackDelay",
     "0x32": "MonsterSpawnSFX",
-    "0x13": "SetWeaponBullet",
-    "0x24": "SetMonsterMoveSpeed",
+    "0x05": "Play Audio Dialog",
     "0x25": "MonsterPathingFlag?",
     "0x26": "SetHealthOrHeal",
     "0x0f": "SetInformationTopic",
@@ -362,14 +376,26 @@
     "0x1a": "ChangeMusic",
     "0x23": "MapCommandIndexCallback",
     "0x36": "MapCommandIDCallback",
-    "0x84": "UnsetFlag",
     "0x91": "RemoveItem",
     "0x9c": "ExitCommand",
     "0x35": "Dbase100CommandCallback",
     "0x34": "CombineWithItem",
     "0xb4": "SetCombinedItem",
+    "0x82": "If item count below or equal, continue",
     "0x83": "If item count equal, continue",
-    "0x2e": "SetBulletDuration"
+    "0x2e": "SetBulletDuration",
+    "0x13": "SetWeaponBullet",
+    "0x14": "",
+    "0x04": "SetFlag",
+    "0x0d": "If flag set, then next command",
+    "0x81": "If not flag set, continue",
+    "0x8d": "If not flag set, next command",
+    "0x01": "If flag set, continue",
+    "0x24": "SetMonsterMoveSpeed",
+    "0x84": "UnsetFlag",
+    "0x1f": "WeaponReloadAnimation",
+    "0x21": "WeaponReloadSFX",
+    "0x9e": "Weapon Y screen offset"
   },
   "itemLabels": {
     "29": "Slanderer",
